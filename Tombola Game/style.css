@@ -1,0 +1,119 @@
+body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #90b2ca, #002ec4);
+      display: flex;
+      height: 100vh;
+    }
+
+    .left, .right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .left {
+      border-right: 2px solid #5492d9;
+      position: relative; 
+    }
+
+    .left > h6{
+  color: #36dbdb;  
+  box-shadow: 0 0 20px rgb(48, 188, 231),
+                  inset 0 0 15px rgb(51, 193, 221);
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+    }
+
+    .right {
+      padding: 20px;
+      overflow-y: auto;
+    }
+    h1, h2 {
+      color: #ffffffd0;
+      margin-bottom: 5px;
+      
+    }
+    .number-display {
+      font-size: 100px;
+      font-weight: bold;
+      color: #ff0000;
+      text-shadow: 2px 2px 4px rgba(128, 190, 65, 0.2);
+      margin-bottom: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      max-width: 600px;
+      gap: 8px;
+    }
+    .grid div {
+      padding: 12px;
+      background-color: #fff;
+      border-radius:10px;
+      font-size: 25px bold white;
+      color: #1d305f78;
+      border: 1px solid #7851b2;
+      box-shadow: 0 1px 4px rgba(79, 182, 214, 0.05);
+      transition: all 0.3s ease;
+    }
+    .called {
+      background-color: #ff0000 !important;
+      color: white !important;
+      font-weight: bold;
+      border-color: #388e3c;
+      box-shadow: 0 0 10px rgba(217, 35, 21, 0.815);
+    }
+    button {
+      padding: 12px 28px;
+      font-size: 20px;
+      background-color: #6333b5;
+      color: white;
+      border: none;
+      border-radius: 15px;
+      cursor: pointer;
+      box-shadow: 5px 5px 7px #250e54bd;
+      transition: background-color 0.3s ease;
+      margin-top: 30px;
+    }
+    button:hover {
+      background-color: #250e54bd;
+    }
+
+    .previous-numbers {
+  font-size: 30px;
+  font-weight: bold;
+  color: #00ffea;
+  margin-top: 10px;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+}
+
+  .reset-btn {
+  position: absolute;
+  top: 0; 
+  right: 20px;
+  padding: 10px 20px;
+  font-size: 12px;
+  font-weight: bolder;
+  background: #e63946;
+  color: white;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  box-shadow: 2px 2px 6px rgba(202, 74, 74, 0.489);
+  transition: 0.3s;
+}
+
+.reset-btn:hover {
+  background: #c71c2f;
+}
+
+
+
+
+

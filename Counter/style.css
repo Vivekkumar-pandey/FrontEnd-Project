@@ -1,0 +1,86 @@
+/* Counter CSS */
+body {
+            font-family: sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            color: white;
+            width: 300px;
+        }
+
+        h1 {
+            font-size: 40px;
+            margin-bottom: 20px;
+        }
+
+        .counter {
+            font-size: 60px;
+            font-weight: bold;
+            margin: 20px 0;
+            text-shadow: 2px 2px 8px  rgba(0,0,0,0.5);
+        }
+
+        button {
+            font-size: 16px;
+            padding: 10px 20px;
+            margin: 8px;
+            cursor: pointer;
+            border: 2px dotted teal;
+            outline: 2px double turquoise;
+            outline-offset: 5px;
+            border-radius: 50%;
+            font-weight: bold;
+            transition: 0.3s ease;
+        }
+
+        .increase {
+            background: #28a745;
+          
+        }
+        .increase:hover {
+            background: #44b05b;
+            transform: scale(1.05);
+        }
+
+        .decrease {
+            background: #dc3545;
+           
+        }
+        .decrease:hover {
+            background: #c82333;
+            transform: scale(1.05);
+        }
+
+        .reset {
+            background: #ffc107;
+          
+        }
+        .reset:hover {
+            background: #e0a800;
+            transform: scale(1.05);
+        }
+
+        h6{    
+    color: #36dbdb;  
+    text-align: bottom;
+    position: absolute;
+    left: 45%;
+    bottom: 2%;
+    box-shadow: 0 0 20px rgb(48, 188, 231),
+                    inset 0 0 15px rgb(51, 193, 221);
+                    font-family: Arial, sans-serif;
+                    font-weight: bold;
+                    
+}

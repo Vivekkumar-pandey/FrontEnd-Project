@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Name Typing Animation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Cinzel:wght@400;600;700&family=Audiowide:wght@400&family=Teko:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./name.css">
+</head>
+<body>
+    <div class="geometric-bg"></div>
+    <canvas class="matrix-rain" id="matrixCanvas"></canvas>
+    <div class="floating-particles" id="particles"></div>
+    
+   
+
+    <div class="style-selector">
+        <button class="style-btn active" data-font="orbitron" data-effect="cyber" data-name="CYBER">CYBER</button>
+        <button class="style-btn" data-font="cinzel" data-effect="elegant" data-name="ELEGANT">ELEGANT</button>
+        <button class="style-btn" data-font="audiowide" data-effect="retro" data-name="RETRO">RETRO</button>
+        <button class="style-btn" data-font="teko" data-effect="bold" data-name="BOLD">BOLD</button>
+        <button class="style-btn" data-font="orbitron" data-effect="minimal" data-name="MINIMAL">MINIMAL</button>
+    </div>
+
+    <div class="input-container">
+        <input type="text" class="premium-input" id="nameInput" placeholder="TYPE YOUR NAME..." maxlength="15">
+    </div>
+
+    <div class="display-area">
+        <div class="text-display font-orbitron effect-cyber" id="textDisplay">
+            <span class="cursor" id="cursor"></span>
+        </div>
+    </div>
+
+    <div class="instructions">
+        ✨ TYPE YOUR NAME • CHOOSE A STYLE  ✨<br>
+      
+    </div>
+     <h6>Design by:- Vivek Kumar</h6>
+
+    <script src="./name.js"></script>
+</body>
+</html>

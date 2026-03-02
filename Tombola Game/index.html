@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tombola Game</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="left">
+    <button class="reset-btn" onclick="resetGame()">Reset Game 🔄</button>
+    <h1>Current Number ▶️ </h1>
+    <div class="number-display" id="current-number">..</div>
+
+      <h2>Previous Numbers ⬇️ (1<sup>st</sup>, 2<sup>nd</sup>, 3<sup>rd</sup>)</h2>
+  <div class="previous-numbers" id="previous-numbers">--</div>
+
+    <button onclick="callNextNumber()">Call Next Number ⏯️ </button>
+
+      <h6>Design by:- Vivek Kumar</h6>
+
+  </div>
+
+
+  <div class="right">
+    <h1>Called Numbers ⬇️</h1>
+    <div class="grid" id="number-grid"></div>
+  </div>
+
+  <script src="./script.js"></script>
+</body>
+</html>

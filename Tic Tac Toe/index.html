@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Tic Tac Toe - Vs AI</title>
+ <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+   <!-- Game Instructions Popup -->
+  <div id="instructionsPopup" class="popup active">
+    <h2>🎮 Game Instructions</h2>
+    <p>
+      Welcome to Tic Tac Toe Vs AI! Here's how leveling works:<br /><br />
+      - Start at <strong>Easy</strong> level. You must win <strong>5 more games than the AI</strong> to move to <strong>Medium</strong>.<br />
+      - At <strong>Medium</strong> level, win <strong>10 more games than the AI</strong> to reach <strong>Hard</strong>.<br />
+      - At <strong>Hard</strong> level, draw <strong>5 times consecutively</strong> to level up, and after <strong>10 draws total</strong> become a <strong>Champion</strong>!<br /><br />
+      Click OK to start the game and experience the challenge!
+    </p>
+    <button id="startGameBtn">OK</button>
+  </div>
+
+  <!-- Header Section -->
+  <header>
+    <h1>Tic Tac Toe</h1>
+    
+    <div class="controls">
+      <label for="difficulty">Difficulty:</label>
+      <select id="difficulty">
+        <option value="easy" selected>Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+      <button id="restart">Restart</button>
+      <button id="quit">Quit</button>
+    </div>
+
+    <!-- Game Stats Section -->
+    <div id="gameStats">
+      <div id="levelDisplay">Level: EASY</div>
+      <div id="drawInfo">
+        <div>Total Draws: <span id="totalDraws">0</span></div>
+        <div>Consecutive Draws: <span id="consecutiveDraws">0</span></div>
+      </div>
+    </div>
+
+    <!-- Scoreboard -->
+    <div class="scoreboard">
+      <div>Player: <span id="playerScore">0</span></div>
+      <div>AI: <span id="aiScore">0</span></div>
+      <div id="timer">Time: 0s</div>
+    </div>
+  </header>
+
+  <!-- Game Board -->
+  <main>
+    <div id="board"></div>
+  </main>
+
+  <!-- Message Placeholder -->
+  <div id="message"></div>
+
+  <!-- Win Popup -->
+  <div id="winPopup" class="popup">
+    <h2>🎉 You Win!</h2>
+    <div class="animation fireworks"></div>
+    <button id="winPopupOk">OK</button>
+  </div>
+
+  <!-- AI Win Popup -->
+  <div id="aiWinPopup" class="popup">
+    <h2>🤖 AI Wins!</h2>
+    <div class="animation balloons"></div>
+    <button id="aiWinPopupOk">OK</button>
+  </div>
+
+  <!-- Draw Popup -->
+  <div id="drawPopup" class="popup">
+    <h2>🤝 It's a Draw!</h2>
+    <button id="drawPopupOk">OK</button>
+  </div>
+
+  <!-- Champion Popup -->
+  <div id="championPopup" class="popup">
+    <h2>🏆 Champion!</h2>
+    <div class="animation fireworks balloons"></div>
+    <p>Congratulations! You mastered the game!</p>
+    <button id="championPopupOk">Quit</button>
+  </div>
+  <script src="./script.js"></script>
+
+</body>
+</html>

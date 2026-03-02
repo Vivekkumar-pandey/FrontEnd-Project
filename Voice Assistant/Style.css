@@ -1,0 +1,90 @@
+body {
+      font-family: "Poppins", sans-serif;
+      text-align: center;
+      background: linear-gradient(135deg, #6a11cb, #2575fc);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+    }
+
+    button {
+      background: linear-gradient(135deg, #ff416c, #ff4b2b);
+      color: white;
+      border: none;
+      padding: 15px 35px;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 50px;
+      cursor: pointer;
+      margin-top: 20px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    p {
+      margin-top: 30px;
+      font-size: 20px;
+      color: #333;
+      padding: 20px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+      min-height: 60px;
+      width: 80%;
+      max-width: 600px;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+
+    /* Animation */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Microphone emoji animation when listening */
+    .listening::before {
+      content: "🎤 ";
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { opacity: 0.3; }
+    }
+ 
+
+  h6{    
+    color: #36dbdb;  
+    text-align: bottom;
+    position: absolute;
+    left: 45%;
+    bottom: 10%;
+    box-shadow: 0 0 20px rgb(48, 188, 231),
+                    inset 0 0 15px rgb(51, 193, 221);
+                    font-family: Arial, sans-serif;
+                    font-weight: bold;
+
+}
+
+
+  

@@ -1,0 +1,46 @@
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f6f6f6;
+  padding: 20px;
+  text-align: center;
+}
+
+.container {
+  background-color: #fff;
+  max-width: 500px;
+  margin: auto;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+}
+
+h1 {
+  margin-bottom: 30px;
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.step {
+  font-size: 20px;
+  padding: 10px;
+  border-left: 5px solid gray;
+  text-align: left;
+  transition: all 0.3s ease;
+}
+
+.active {
+  border-left: 5px solid green;
+  background-color: #e6ffe6;
+  font-weight: bold;
+}
+
+button {
+  margin-top: 30px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}

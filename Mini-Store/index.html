@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MiniStore</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 🔷 Navigation Bar -->
+   
+  <nav class="navbar">
+    <div class="logo">🛍️ MiniStore</div>
+    <ul class="nav-links">
+      <li><a href="#">Home</a></li>
+      <li><a href="./About us.html">About Us</a></li>
+      <li><a href="./Login.html">Log In</a></li>
+      <li><a href="#cart-section">Cart🛒</a></li>
+      <li><a href="delivery.html">Order📦</a></li>
+    </ul>
+  </nav>
+
+  <section class="marquee">
+  <div class="marquee-text">
+    🎉 Special Offer! Get 50% off on your first order at MiniStore! 🎉
+  </div>
+</section>
+
+  <!-- 🔷 Main Content -->
+  <div class="container">
+    <h1>Welcome to MiniStore!</h1>
+    <div id="products" class="product-grid"></div>
+
+
+    <!--🔷 Cart Section -->
+    <h2>Your Cart 🛒</h2>
+    <div id="cart-section">
+      <ul id="cart"></ul>
+      <p id="total">Total: ₹0</p>
+    </div>
+
+    <!-- 🔷 Address and Order Section -->
+<div id="addressForm" style="display:none; margin-top: 20px;">
+  <h3>Enter Delivery Details</h3>
+  <input type="text" id="name" placeholder="Full Name" required><br><br>
+  <input type="text" id="phone" placeholder="Phone Number" required><br><br>
+  <textarea id="address" placeholder="Delivery Address" required></textarea><br><br>
+  <button onclick="submitOrder()">Confirm & Track</button>
+</div>
+
+<button onclick="showAddressForm()" style="margin-top: 10px;">Place Order</button>
+
+
+  <!-- 🔷 Footer -->
+<footer class="footer">
+<h2>MiniStore</h2>
+<p>C-20 Sector - 2, Noida, Uttar Pradesh, 123456</p>
+<p>About Us: MiniStore is a simple e-commerce site.</p>
+<p>Contact: support@ministore.com | 📞 +91-98765-12345</p>
+
+<div class="social-links">
+  <a href="https://facebook.com"><i class="fab fa-facebook-f"></i></a>
+  <a href="https://twitter.com"><i class="fab fa-twitter"></i></a>
+  <a href="https://instagram.com"><i class="fab fa-instagram"></i></a>
+  <a href="https://linkedin.com"><i class="fab fa-linkedin-in"></i></a>
+</div>
+
+<p>Design and Developed by Vivek Kumar</p>
+<p>&copy; 2025 MiniStore. All rights reserved.</p>
+</footer>
+  <script src="script.js"></script>
+</body>
+</html> 
+

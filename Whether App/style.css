@@ -1,0 +1,93 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #7794a1, #203a43, #007aae);
+    color: #fff;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .container {
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 15px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 400px;
+  }
+  
+  input[type="text"] {
+    width: 80%;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  
+  button {
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #ffffff;
+    color: #4e54c8;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  button:hover {
+    background-color: #e0e0e0;
+  }
+  
+  .weather-info {
+    margin-top: 15px;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 15px;
+    border-radius: 15px;
+    color: #fff;
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .weather-info h2 {
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
+  
+  .weather-info p {
+    font-size: 15px;
+    margin: 4px 0;
+  }
+  .weather-icon {
+    width: 35px;
+    height: 35px;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(15px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+    
+  h6{    
+    color: #36dbdb;  
+    text-align: bottom;
+    position: absolute;
+    left: 45%;
+    bottom: 2%;
+    box-shadow: 0 0 20px rgb(48, 188, 231),
+                    inset 0 0 15px rgb(51, 193, 221);
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+                    
+}
+  
