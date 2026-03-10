@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>TTT Test Runner</title>
+    <style>
+        * {
+            margin: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #0a0e1a;
+            color: #e0e0e0;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+            color: #00e5ff;
+        }
+
+        .suite {
+            margin-bottom: 1.5rem;
+        }
+
+        .suite h2 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: #b0b0b0;
+        }
+
+        .test {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+            border-left: 3px solid;
+            margin-bottom: 0.3rem;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .pass {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.08);
+            color: #22c55e;
+        }
+
+        .fail {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.08);
+            color: #ef4444;
+        }
+
+        .summary {
+            margin-top: 2rem;
+            font-size: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .summary.all-pass {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+        }
+
+        .summary.has-fail {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🧪 Tic Tac Toe — Test Runner</h1>
+    <div id="results"></div>
+    <div id="summary"></div>
+
+    <script type="module">
+        import { checkWinner, isBoardFull, getEmptyCells, WIN_COMBOS } from '../scripts/utils.js';
+        import { getEasyMove, getMediumMove, getHardMove } from '../scripts/ai.js';
+
+        const results = [];
+        const container = document.getElementById('results');
+
+        function assert(condition, name) {
+            results.push({ name, pass: !!condition });
+        }
+
+        function suite(name, fn) {
+            const div = document.createElement('div');
+            div.className = 'suite';
+            div.innerHTML = `<h2>${name}</h2>`;
+            container.appendChild(div);
+            const before = results.length;
+            fn();
+            for (let i = before; i < results.length; i++) {
+                const r = results[i];
+                const el = document.createElement('div');
+                el.className = `test ${r.pass ? 'pass' : 'fail'}`;
+                el.textContent = `${r.pass ? '✓' : '✗'} ${r.name}`;
+                div.appendChild(el);
+            }
+        }
+
+        // ─────── TESTS ───────
+
+        suite('Win Detection', () => {
+            // All 8 win combos
+            for (const combo of WIN_COMBOS) {
+                const board = Array(9).fill('');
+                combo.forEach(i => board[i] = 'X');
+                const result = checkWinner(board, 'X');
+                assert(result && JSON.stringify(result) === JSON.stringify(combo),
+                    `Combo [${combo}] detected for X`);
+            }
+
+            // No winner on empty board
+            assert(!checkWinner(Array(9).fill(''), 'X'), 'Empty board = no winner');
+
+            // No winner on mixed board
+            const mixed = ['X', 'O', 'X', 'O', 'X', 'O', 'O', 'X', 'O'];
+            assert(!checkWinner(mixed, 'X') && !checkWinner(mixed, 'O'), 'No winner on draw board');
+        });
+
+        suite('Board Full Detection', () => {
+            assert(!isBoardFull(Array(9).fill('')), 'Empty board is not full');
+            assert(isBoardFull(['X', 'O', 'X', 'O', 'X', 'O', 'O', 'X', 'O']), 'Full board detected');
+            const partial = Array(9).fill('X');
+            partial[4] = '';
+            assert(!isBoardFull(partial), 'Partial board not full');
+        });
+
+        suite('Empty Cells', () => {
+            assert(getEmptyCells(Array(9).fill('')).length === 9, '9 empty cells on empty board');
+            assert(getEmptyCells(['X', 'O', 'X', 'O', 'X', 'O', 'O', 'X', 'O']).length === 0, '0 empty on full board');
+            const b = Array(9).fill('');
+            b[0] = 'X'; b[4] = 'O';
+            assert(getEmptyCells(b).length === 7, '7 empty after 2 moves');
+        });
+
+        suite('AI — Easy', () => {
+            const board = Array(9).fill('');
+            board[4] = 'X';
+            const move = getEasyMove(board);
+            assert(move >= 0 && move < 9 && board[move] === '', 'Returns valid empty cell');
+        });
+
+        suite('AI — Medium', () => {
+            // Should block player win
+            const board = ['X', 'X', '', '', 'O', '', '', '', ''];
+            const move = getMediumMove(board, 'O', 'X');
+            assert(move === 2, 'Blocks X from winning at index 2');
+
+            // Should take winning move
+            const board2 = ['X', 'X', '', 'O', 'O', '', '', '', ''];
+            const move2 = getMediumMove(board2, 'O', 'X');
+            assert(move2 === 5, 'Takes winning move at index 5');
+        });
+
+        suite('AI — Hard (Minimax)', () => {
+            // Should never lose from empty board
+            const board = Array(9).fill('');
+            board[0] = 'X'; // player takes corner
+            const move = getHardMove(board, 'O', 'X');
+            assert(move === 4, 'Takes center against corner opening');
+
+            // Should block immediate threat
+            const board2 = ['X', '', 'X', '', 'O', '', '', '', ''];
+            const move2 = getHardMove(board2, 'O', 'X');
+            assert(move2 === 1, 'Blocks row 0 threat at index 1');
+
+            // Should take win when available
+            const board3 = ['X', 'X', '', 'O', 'O', '', '', '', ''];
+            const move3 = getHardMove(board3, 'O', 'X');
+            assert(move3 === 5, 'Takes winning move at index 5');
+        });
+
+        // ─────── SUMMARY ───────
+
+        const passed = results.filter(r => r.pass).length;
+        const failed = results.filter(r => !r.pass).length;
+        const total = results.length;
+        const summaryEl = document.getElementById('summary');
+        summaryEl.className = `summary ${failed ? 'has-fail' : 'all-pass'}`;
+        summaryEl.textContent = `${passed}/${total} tests passed${failed ? ` — ${failed} failed` : ' ✓'}`;
+    </script>
+</body>
+
+</html>

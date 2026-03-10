@@ -1,94 +1,280 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
- <title>Tic Tac Toe - Vs AI</title>
- <link rel="stylesheet" href="./style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe — Neon Arena</title>
+  <meta name="description"
+    content="Play Tic Tac Toe against AI or friends online. Modern neon UI with sound, animations, and theme switching.">
+  <meta name="theme-color" content="#00e5ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="./manifest.json">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@500;700&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="./styles/style.css">
+
+  <!-- PeerJS for WebRTC multiplayer -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
+
 <body>
 
-   <!-- Game Instructions Popup -->
-  <div id="instructionsPopup" class="popup active">
-    <h2>🎮 Game Instructions</h2>
-    <p>
-      Welcome to Tic Tac Toe Vs AI! Here's how leveling works:<br /><br />
-      - Start at <strong>Easy</strong> level. You must win <strong>5 more games than the AI</strong> to move to <strong>Medium</strong>.<br />
-      - At <strong>Medium</strong> level, win <strong>10 more games than the AI</strong> to reach <strong>Hard</strong>.<br />
-      - At <strong>Hard</strong> level, draw <strong>5 times consecutively</strong> to level up, and after <strong>10 draws total</strong> become a <strong>Champion</strong>!<br /><br />
-      Click OK to start the game and experience the challenge!
-    </p>
-    <button id="startGameBtn">OK</button>
-  </div>
+  <!-- Skip to content (accessibility) -->
+  <a href="#board" class="skip-link">Skip to game board</a>
 
-  <!-- Header Section -->
-  <header>
-    <h1>Tic Tac Toe</h1>
-    
-    <div class="controls">
-      <label for="difficulty">Difficulty:</label>
-      <select id="difficulty">
-        <option value="easy" selected>Easy</option>
-        <option value="medium">Medium</option>
-        <option value="hard">Hard</option>
+  <!-- Particle background canvas -->
+  <canvas id="bgCanvas" aria-hidden="true"></canvas>
+
+  <div class="app-wrapper">
+
+    <!-- ═══════════ HEADER ═══════════ -->
+    <header class="app-header" role="banner">
+      <h1>TIC TAC TOE</h1>
+      <p class="subtitle">NEON ARENA</p>
+    </header>
+
+    <!-- ═══════════ CONTROLS ═══════════ -->
+    <nav class="controls" role="toolbar" aria-label="Game controls">
+      <select id="difficulty" aria-label="AI Difficulty">
+        <option value="easy" selected>⚡ Easy</option>
+        <option value="medium">🔥 Medium</option>
+        <option value="hard">💀 Hard</option>
       </select>
-      <button id="restart">Restart</button>
-      <button id="quit">Quit</button>
+      <select id="modeSelect" aria-label="Game Mode">
+        <option value="pvai">🤖 vs AI</option>
+        <option value="pvp">👥 Local PvP</option>
+        <option value="online">🌐 Online PvP</option>
+      </select>
+      <button class="ctrl-btn" id="undoBtn" aria-label="Undo last move">↩ Undo</button>
+      <button class="ctrl-btn" id="restart" aria-label="Restart current round">🔄 Restart</button>
+      <button class="ctrl-btn" id="quit" aria-label="Reset all scores and restart">⏹ Quit</button>
+      <button class="ctrl-btn" id="soundToggle" aria-label="Toggle sound effects">🔊 Sound</button>
+      <button class="ctrl-btn" id="statsToggle" aria-label="Toggle statistics panel">📊 Stats</button>
+    </nav>
+
+    <!-- ═══════════ SCOREBOARD ═══════════ -->
+    <section class="scoreboard" aria-label="Score">
+      <div class="score-card player">
+        <span class="label">Player</span>
+        <span class="score-value" id="playerScore" aria-live="polite">0</span>
+      </div>
+      <div class="vs-divider">
+        <span class="vs-badge">VS</span>
+      </div>
+      <div class="score-card opponent">
+        <span class="label" id="opponentLabel">AI</span>
+        <span class="score-value" id="aiScore" aria-live="polite">0</span>
+      </div>
+    </section>
+
+    <!-- ═══════════ STATS BAR ═══════════ -->
+    <div class="stats-bar" aria-label="Game statistics">
+      <div class="stat-item" id="levelDisplay">Level: EASY</div>
+      <div class="stat-item" id="timer">⏱ 0s</div>
+      <div class="stat-item">Draws: <span class="value" id="totalDraws">0</span></div>
+      <div class="stat-item">Streak: <span class="value" id="consecutiveDraws">0</span></div>
     </div>
 
-    <!-- Game Stats Section -->
-    <div id="gameStats">
-      <div id="levelDisplay">Level: EASY</div>
-      <div id="drawInfo">
-        <div>Total Draws: <span id="totalDraws">0</span></div>
-        <div>Consecutive Draws: <span id="consecutiveDraws">0</span></div>
+    <!-- ═══════════ TURN INDICATOR ═══════════ -->
+    <div id="turnIndicator" role="status" aria-live="polite"></div>
+
+    <!-- ═══════════ GAME AREA ═══════════ -->
+    <main class="game-area" role="main">
+      <div id="board" role="grid" aria-label="Tic Tac Toe game board"></div>
+    </main>
+
+    <!-- ═══════════ FOOTER ═══════════ -->
+    <footer class="app-footer" role="contentinfo">
+      <div class="footer-settings">
+        <span class="settings-label">Theme</span>
+        <div class="theme-switcher" role="radiogroup" aria-label="Select colour theme">
+          <button class="theme-btn active" data-theme="dark" role="radio" aria-checked="true"
+            aria-label="Dark theme"></button>
+          <button class="theme-btn" data-theme="light" role="radio" aria-checked="false"
+            aria-label="Light theme"></button>
+          <button class="theme-btn" data-theme="neon" role="radio" aria-checked="false"
+            aria-label="Neon theme"></button>
+        </div>
+      </div>
+      <p class="footer-copyright">Tic Tac Toe Neon Arena &copy; 2026</p>
+    </footer>
+
+  </div>
+  <!-- /.app-wrapper -->
+
+  <!-- ═══════════ STATS SIDEBAR ═══════════ -->
+  <aside id="statsSidebar" class="stats-sidebar" aria-label="Game statistics panel">
+    <div class="stats-sidebar-header">
+      <h2>📊 Statistics</h2>
+      <button class="stats-close" id="statsClose" aria-label="Close stats panel">&times;</button>
+    </div>
+
+    <div class="stats-ring-wrap">
+      <svg viewBox="0 0 120 120" class="stats-ring-svg">
+        <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8" />
+        <circle id="winRateRing" cx="60" cy="60" r="54" fill="none" stroke="var(--accent)" stroke-width="8"
+          stroke-linecap="round" transform="rotate(-90 60 60)"
+          style="stroke-dasharray: 339.29; stroke-dashoffset: 339.29; transition: stroke-dashoffset 0.6s ease;" />
+      </svg>
+      <div class="stats-ring-label">
+        <span class="stats-ring-value" id="statWinRate">0%</span>
+        <span class="stats-ring-text">Win Rate</span>
       </div>
     </div>
 
-    <!-- Scoreboard -->
-    <div class="scoreboard">
-      <div>Player: <span id="playerScore">0</span></div>
-      <div>AI: <span id="aiScore">0</span></div>
-      <div id="timer">Time: 0s</div>
+    <div class="stats-grid">
+      <div class="stats-cell">
+        <span class="stats-cell-value" id="statGamesPlayed">0</span>
+        <span class="stats-cell-label">Played</span>
+      </div>
+      <div class="stats-cell wins">
+        <span class="stats-cell-value" id="statWins">0</span>
+        <span class="stats-cell-label">Wins</span>
+      </div>
+      <div class="stats-cell losses">
+        <span class="stats-cell-value" id="statLosses">0</span>
+        <span class="stats-cell-label">Losses</span>
+      </div>
+      <div class="stats-cell">
+        <span class="stats-cell-value" id="statDraws">0</span>
+        <span class="stats-cell-label">Draws</span>
+      </div>
     </div>
-  </header>
 
-  <!-- Game Board -->
-  <main>
-    <div id="board"></div>
-  </main>
+    <div class="stats-extras">
+      <div class="stats-extra-row">
+        <span>🔥 Best Streak</span>
+        <span class="stats-extra-value" id="statBestStreak">0</span>
+      </div>
+      <div class="stats-extra-row">
+        <span>⚡ Fastest Win</span>
+        <span class="stats-extra-value" id="statFastestWin">—</span>
+      </div>
+    </div>
+  </aside>
 
-  <!-- Message Placeholder -->
-  <div id="message"></div>
+  <!-- ══════════════════════════ POPUPS ══════════════════════════ -->
 
-  <!-- Win Popup -->
-  <div id="winPopup" class="popup">
-    <h2>🎉 You Win!</h2>
-    <div class="animation fireworks"></div>
-    <button id="winPopupOk">OK</button>
+  <!-- Instructions -->
+  <div id="instructionsPopup" class="popup active" role="dialog" aria-modal="true" aria-labelledby="instructionsTitle">
+    <div class="popup-card">
+      <h2 id="instructionsTitle">🎮 Game Rules</h2>
+      <ul class="rules-list">
+        <li>Start at <strong>Easy</strong> level. Win <strong>5 games</strong> to advance to <strong>Medium</strong>.
+        </li>
+        <li>At <strong>Medium</strong>, win <strong>10 games</strong> to reach <strong>Hard</strong>.</li>
+        <li>At any level, draw <strong>5 times in a row</strong> to level up.</li>
+        <li>At <strong>Hard</strong>, draw <strong>7 times in a row</strong> to become <strong>Champion</strong>!</li>
+        <li>Select <strong>Online PvP</strong> to create or join a room and play with friends on any device.</li>
+        <li>Choose a <strong>theme</strong> and toggle <strong>sound</strong> to customize your experience.</li>
+      </ul>
+      <button class="btn" id="startGameBtn" autofocus>START GAME</button>
+    </div>
   </div>
 
-  <!-- AI Win Popup -->
-  <div id="aiWinPopup" class="popup">
-    <h2>🤖 AI Wins!</h2>
-    <div class="animation balloons"></div>
-    <button id="aiWinPopupOk">OK</button>
+  <!-- Lobby (Online PvP) -->
+  <div id="lobbyPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="lobbyTitle">
+    <div class="popup-card lobby-card">
+      <h2 id="lobbyTitle">🌐 Online PvP</h2>
+      <p class="lobby-subtitle">Play with a friend on any device</p>
+
+      <div class="lobby-sections">
+        <div class="lobby-section" id="lobbyCreateSection">
+          <button class="btn btn-create" id="lobbyCreateBtn">Create Room</button>
+          <div class="room-code-display" id="lobbyRoomCode" style="display:none;" aria-live="polite"></div>
+          <div class="room-actions" id="roomActions" style="display:none;">
+            <button class="btn-icon" id="copyCodeBtn" title="Copy room code" aria-label="Copy room code">📋 Copy
+              Code</button>
+            <button class="btn-icon" id="shareLinkBtn" title="Copy join link" aria-label="Copy shareable link">🔗 Share
+              Link</button>
+          </div>
+        </div>
+
+        <div class="lobby-divider"><span>OR</span></div>
+
+        <div class="lobby-section" id="lobbyJoinSection">
+          <div class="join-input-group">
+            <input type="text" id="lobbyCodeInput" class="lobby-input" placeholder="Enter room code" maxlength="6"
+              spellcheck="false" autocomplete="off" aria-label="Room code">
+            <button class="btn btn-join" id="lobbyJoinBtn">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lobby-status-bar">
+        <span class="status-dot" id="lobbyDot"></span>
+        <span class="lobby-status-text" id="lobbyStatus">Choose an option above</span>
+      </div>
+
+      <button class="btn btn-leave" id="lobbyLeaveBtn">← Back</button>
+    </div>
   </div>
 
-  <!-- Draw Popup -->
-  <div id="drawPopup" class="popup">
-    <h2>🤝 It's a Draw!</h2>
-    <button id="drawPopupOk">OK</button>
+  <!-- Player Wins -->
+  <div id="winPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="popup-card">
+      <h2 id="winTitle">🎉 You Win!</h2>
+      <p>Brilliant move! You're climbing the ranks.</p>
+      <button class="btn" id="winPopupOk">Next Round</button>
+    </div>
   </div>
 
-  <!-- Champion Popup -->
-  <div id="championPopup" class="popup">
-    <h2>🏆 Champion!</h2>
-    <div class="animation fireworks balloons"></div>
-    <p>Congratulations! You mastered the game!</p>
-    <button id="championPopupOk">Quit</button>
+  <!-- AI Wins -->
+  <div id="aiWinPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="aiWinTitle">
+    <div class="popup-card">
+      <h2 id="aiWinTitle">🤖 AI Wins!</h2>
+      <p>The machine got this one. Regroup and try again!</p>
+      <button class="btn" id="aiWinPopupOk">Rematch</button>
+    </div>
   </div>
-  <script src="./script.js"></script>
 
+  <!-- Draw -->
+  <div id="drawPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="drawTitle">
+    <div class="popup-card">
+      <h2 id="drawTitle">🤝 It's a Draw!</h2>
+      <p>Evenly matched. Can you break the stalemate?</p>
+      <button class="btn" id="drawPopupOk">Next Round</button>
+    </div>
+  </div>
+
+  <!-- Level Up -->
+  <div id="levelUpPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="levelUpTitle">
+    <div class="popup-card">
+      <h2 id="levelUpTitle">⬆️ Level Up!</h2>
+      <p id="levelUpText">You've advanced!</p>
+      <button class="btn" id="levelUpOk">Continue</button>
+    </div>
+  </div>
+
+  <!-- PvP / Online Win -->
+  <div id="pvpWinPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="pvpWinTitle">
+    <div class="popup-card">
+      <h2 id="pvpWinTitle">🎉 Player Wins!</h2>
+      <p>Well played!</p>
+      <button class="btn" id="pvpWinPopupOk">Next Round</button>
+    </div>
+  </div>
+
+  <!-- Champion -->
+  <div id="championPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="championTitle">
+    <div class="popup-card">
+      <h2 id="championTitle">🏆 CHAMPION!</h2>
+      <p>Congratulations — you mastered the Neon Arena!</p>
+      <button class="btn" id="championPopupOk">Play Again</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ ES6 Module Entry ═══════════ -->
+  <script type="module" src="./scripts/game.js"></script>
 </body>
+
 </html>
