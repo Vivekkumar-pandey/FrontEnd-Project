@@ -24,6 +24,12 @@ function defaultState() {
         theme: 'dark',
         gameMode: 'pvai',
         soundEnabled: true,
+        playerRating: 1000,
+        rank: 'Intermediate',
+        aiPersonality: 'perfect',
+        adaptiveWinStreak: 0,
+        adaptiveLossStreak: 0,
+        adaptiveDifficulty: true,
     };
 }
 
@@ -98,4 +104,27 @@ export function addLeaderboardEntry(name, wins) {
     board.push({ name, wins, date: new Date().toLocaleDateString() });
     board.sort((a, b) => b.wins - a.wins);
     localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(board.slice(0, 10)));
+}
+
+/* ────────────── Match Replays ────────────── */
+
+export function loadReplays() {
+    try {
+        const raw = localStorage.getItem('ttt_replays');
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+export function saveReplay(replayData) {
+    try {
+        const replays = loadReplays();
+        replays.unshift(replayData); // Add to beginning (newest first)
+
+        // Keep only the last 10 replays to save storage
+        if (replays.length > 10) replays.length = 10;
+
+        localStorage.setItem('ttt_replays', JSON.stringify(replays));
+    } catch { /* Storage full */ }
 }

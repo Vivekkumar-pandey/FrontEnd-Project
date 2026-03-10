@@ -43,6 +43,14 @@ const initialState = {
     gameMode: 'pvai',
     soundEnabled: true,
 
+    // Advanced Systems
+    playerRating: 1000,
+    rank: 'Intermediate',
+    aiPersonality: 'perfect',
+    adaptiveWinStreak: 0,
+    adaptiveLossStreak: 0,
+    adaptiveDifficulty: true,
+
     // Online
     myMark: 'X',
 };

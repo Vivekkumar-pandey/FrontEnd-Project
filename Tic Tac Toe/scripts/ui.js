@@ -415,6 +415,30 @@ export function updateStatsDisplay(level, drawStreak, playerWins) {
 }
 
 /**
+ * Update ELO Rating UI badge with animation.
+ */
+export function updateEloDisplay(rating, rank, delta) {
+    const badge = document.getElementById('eloBadge');
+    const ratingDisplay = document.getElementById('ratingDisplay');
+    const rankDisplay = document.getElementById('rankDisplay');
+    const deltaDisplay = document.getElementById('ratingDelta');
+
+    if (ratingDisplay) ratingDisplay.textContent = Math.floor(rating);
+    if (rankDisplay) rankDisplay.textContent = rank;
+
+    if (delta !== 0 && deltaDisplay) {
+        deltaDisplay.textContent = delta > 0 ? `+${delta}` : delta;
+        deltaDisplay.className = `rating-delta ${delta > 0 ? 'positive' : 'negative'}`;
+        deltaDisplay.classList.add('show-delta');
+
+        // Remove animation class after sequence playing
+        setTimeout(() => {
+            deltaDisplay.classList.remove('show-delta');
+        }, 2000);
+    }
+}
+
+/**
  * Show / hide a popup.
  */
 export function showPopup(id) {
@@ -508,4 +532,53 @@ export function renderStatsPanel(stats) {
         ring.style.strokeDasharray = `${circumference}`;
         ring.style.strokeDashoffset = `${circumference - (circumference * winRate / 100)}`;
     }
+}
+
+/**
+ * Render the Match History sidebar list
+ */
+export function renderHistoryList(replays, onReplayClick) {
+    const list = document.getElementById('historyList');
+    if (!list) return;
+
+    if (!replays || replays.length === 0) {
+        list.innerHTML = '<p class="history-empty">No games played yet.</p>';
+        return;
+    }
+
+    list.innerHTML = '';
+    replays.forEach((replay) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.padding = '10px';
+        item.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+
+        const info = document.createElement('div');
+        info.className = 'history-info';
+
+        let difficultyStr = replay.difficulty ? ` (${replay.difficulty})` : '';
+        info.innerHTML = `
+            <strong style="color: var(--text-primary); text-transform: uppercase; font-size: 0.9rem;">${replay.mode === 'pvai' ? 'vs AI' : replay.mode}${difficultyStr}</strong>
+            <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 4px;">${replay.date} - ${replay.outcome}</span>
+            <span style="font-size: 0.85rem; color: var(--text-muted); display: block;">${replay.moves.length} moves</span>
+        `;
+
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-secondary';
+        btn.style.padding = '4px 12px';
+        btn.style.fontSize = '0.85rem';
+        btn.textContent = 'Replay';
+        btn.onclick = () => {
+            const sidebar = document.getElementById('historySidebar');
+            if (sidebar) sidebar.classList.remove('open');
+            onReplayClick(replay);
+        };
+
+        item.appendChild(info);
+        item.appendChild(btn);
+        list.appendChild(item);
+    });
 }

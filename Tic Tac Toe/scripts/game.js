@@ -9,7 +9,7 @@ import { checkWinner, isBoardFull, createTimer } from './utils.js';
 import { getState, setState, subscribe, resetGameState, resetAllScores } from './state.js';
 import { getRoomCode } from './multiplayer.js';
 import { getAIMove } from './ai.js';
-import { loadState, saveState, loadStats, saveStats } from './storage.js';
+import { loadState, saveState, loadStats, saveStats, saveReplay, loadReplays } from './storage.js';
 import {
     playMoveSound, playWinSound, playLoseSound, playDrawSound, playLevelUpSound,
     launchConfetti, initParticleBackground, applyTheme,
@@ -18,8 +18,8 @@ import {
     showPopup, hidePopup, hideAllPopups,
     setTimerDisplay, updateModeLabel, updateRoomInfoBar,
     toggleSound, setSoundEnabled,
-    renderStatsPanel,
-    shakeBoard,
+    renderStatsPanel, renderHistoryList,
+    shakeBoard, updateEloDisplay,
 } from './ui.js';
 import {
     createRoom, joinRoom, sendMove, sendRestart, sendLeave,
@@ -200,7 +200,7 @@ function makeMove(index, mark) {
             if (cur.gameStatus !== 'playing') return;
             const difficulty = resolveDifficulty();
             console.log("Resolved AI difficulty:", difficulty); // Temporary log for validation
-            const aiIdx = getAIMove(cur.board, difficulty, 'O', 'X');
+            const aiIdx = getAIMove(cur.board, difficulty, 'O', 'X', cur.aiPersonality);
             setState({ isAIThinking: false });
             makeMove(aiIdx, 'O');
         }, 450);
@@ -208,6 +208,20 @@ function makeMove(index, mark) {
 }
 
 /* ════════════════════════ Outcomes ════════════════════════ */
+
+function recordMatchReplay(outcome) {
+    const s = getState();
+    if (s.moveHistory.length === 0) return;
+
+    saveReplay({
+        id: Date.now(),
+        date: new Date().toLocaleDateString(),
+        mode: s.gameMode,
+        difficulty: resolveDifficulty(),
+        moves: [...s.moveHistory],
+        outcome: outcome
+    });
+}
 
 function handleWin(mark) {
     const s = getState();
@@ -228,6 +242,8 @@ function handleWin(mark) {
                 playerScore: s.playerScore + 1,
                 playerWins: s.playerWins + 1,
                 stats: newStats,
+                adaptiveWinStreak: s.adaptiveWinStreak + 1,
+                adaptiveLossStreak: 0,
             });
             // drawStreak is NOT reset on player win — only on AI win
             updateLevel('win');
@@ -246,9 +262,12 @@ function handleWin(mark) {
                 aiScore: s.aiScore + 1,
                 drawStreak: 0, // AI win resets draw streak
                 stats: newStats,
+                adaptiveLossStreak: s.adaptiveLossStreak + 1,
+                adaptiveWinStreak: 0,
             });
             playLoseSound();
             shakeBoard(); // Visual feedback on loss
+            updateElo('loss');
             updateLevel('loss');
             trackEvent('game_loss', { difficulty: resolveDifficulty(), duration });
             setTimeout(() => showPopup('aiWinPopup'), 500);
@@ -282,6 +301,10 @@ function handleWin(mark) {
     }
 
     const cur = getState();
+    if (s.gameMode === 'pvai') updateElo('win');
+
+    recordMatchReplay(`${mark} wins`);
+
     updateScoreDisplay(cur.playerScore, cur.aiScore);
     updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
     renderStatsPanel(cur.stats);
@@ -308,17 +331,47 @@ function handleDraw() {
     trackEvent('game_draw', { difficulty: resolveDifficulty(), duration });
 
     if (s.gameMode === 'pvai') {
+        updateElo('draw');
         updateLevel('draw');
     }
 
     const cur = getState();
+    recordMatchReplay('draw');
     updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
     renderStatsPanel(cur.stats);
     setTimeout(() => showPopup('drawPopup'), 300);
     persistState();
 }
 
-/* ════════════════════════ Levelling ════════════════════════ */
+/* ════════════════════════ Levelling & ELO ════════════════════════ */
+
+function updateElo(outcome) {
+    const s = getState();
+    if (s.gameMode !== 'pvai') return;
+
+    // Outcome point deltas per ai difficulty
+    const eloDeltas = {
+        easy: { win: 10, loss: -25, draw: -5 },
+        medium: { win: 15, loss: -20, draw: 0 },
+        hard: { win: 25, loss: -15, draw: 5 }
+    };
+
+    const diff = resolveDifficulty();
+    const map = eloDeltas[diff] || eloDeltas.medium;
+    let change = map[outcome] || 0;
+
+    let newRating = Math.max(0, s.playerRating + change);
+
+    // Determine new rank
+    let rankName = 'Beginner';
+    if (newRating >= 1600) rankName = 'Grandmaster';
+    else if (newRating >= 1400) rankName = 'Master';
+    else if (newRating >= 1200) rankName = 'Advanced';
+    else if (newRating >= 1000) rankName = 'Intermediate';
+
+    setState({ playerRating: newRating, rank: rankName });
+    updateEloDisplay(newRating, rankName, change);
+}
 
 function updateLevel(outcome) {
     const s = getState();
@@ -363,15 +416,46 @@ function updateLevel(outcome) {
         setTimeout(() => showPopup('championPopup'), 600);
     }
 
-    const sel = document.getElementById('difficulty');
-    if (sel && !getState().manualDifficulty) {
-        sel.value = getDifficultyForLevel();
-    }
 
     const cur = getState();
     updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
 
     console.log(`[Progression] Level: ${cur.level}, PlayerWins: ${cur.playerWins}, HardWins: ${cur.hardWins}, DrawStreak: ${cur.drawStreak}`);
+}
+
+/**
+ * Determine the actual difficulty to play.
+ * If manualDifficulty is set, use that, otherwise level-based.
+ */
+function resolveDifficulty() {
+    const s = getState();
+    let baseDifficulty = s.manualDifficulty ? s.difficulty : getDifficultyForLevel();
+
+    // Apply Dynamic Difficulty Adjustment (DDA)
+    if (s.adaptiveDifficulty && s.gameMode === 'pvai') {
+        const levels = ['easy', 'medium', 'hard'];
+        let idx = levels.indexOf(baseDifficulty);
+
+        // Promote if crushing it
+        if (idx < 2 && s.adaptiveWinStreak >= 4) {
+            return levels[idx + 1];
+        }
+        // Demote if struggling
+        if (idx > 0 && s.adaptiveLossStreak >= 3) {
+            return levels[idx - 1];
+        }
+    }
+
+    return baseDifficulty;
+}
+
+function getDifficultyForLevel() {
+    const s = getState();
+    switch (s.level) {
+        case 1: return 'easy';
+        case 2: return 'medium';
+        default: return 'hard';
+    }
 }
 
 function showLevelUpPopup(level) {
@@ -406,6 +490,110 @@ function undoLastMove() {
 
     setState({ board: newBoard, moveHistory: newHistory, currentPlayer: 'X' });
     updateTurnUI();
+}
+
+/* ════════════════════════ Match Replay ════════════════════════ */
+
+let currentReplay = null;
+let currentReplayStep = 0;
+let replayInterval = null;
+
+function renderReplayStep() {
+    if (!currentReplay) return;
+
+    document.querySelectorAll('.cell').forEach(cell => {
+        cell.innerHTML = '';
+        cell.classList.remove('win-cell', 'hint-glow');
+    });
+
+    const b = Array(9).fill('');
+    for (let i = 0; i < currentReplayStep; i++) {
+        const move = currentReplay.moves[i];
+        const cell = document.querySelector(`.cell[data-index="${move.index}"]`);
+        if (cell) renderMark(cell, move.mark);
+        b[move.index] = move.mark;
+    }
+
+    const prevBtn = document.getElementById('replayPrevBtn');
+    const nextBtn = document.getElementById('replayNextBtn');
+    if (prevBtn) prevBtn.disabled = currentReplayStep === 0;
+    if (nextBtn) nextBtn.disabled = currentReplayStep === currentReplay.moves.length;
+
+    if (currentReplayStep === currentReplay.moves.length) {
+        const winComboX = checkWinner(b, 'X');
+        const winComboO = checkWinner(b, 'O');
+        if (winComboX) highlightWinningCells(winComboX);
+        if (winComboO) highlightWinningCells(winComboO);
+        if (replayInterval) toggleReplayPlay();
+    }
+}
+
+function replayNext() {
+    if (currentReplay && currentReplayStep < currentReplay.moves.length) {
+        currentReplayStep++;
+        playMoveSound();
+        renderReplayStep();
+    }
+}
+
+function replayPrev() {
+    if (currentReplay && currentReplayStep > 0) {
+        currentReplayStep--;
+        renderReplayStep();
+    }
+}
+
+function toggleReplayPlay() {
+    const btn = document.getElementById('replayPlayPauseBtn');
+    if (replayInterval) {
+        clearInterval(replayInterval);
+        replayInterval = null;
+        if (btn) btn.textContent = '⏯';
+    } else {
+        if (currentReplayStep === currentReplay.moves.length) {
+            currentReplayStep = 0; // Restart if at end
+            renderReplayStep();
+        }
+        if (btn) btn.textContent = '⏸';
+        replayInterval = setInterval(() => {
+            replayNext();
+            if (currentReplayStep >= currentReplay.moves.length) toggleReplayPlay();
+        }, 800);
+    }
+}
+
+function startReplay(replayData) {
+    if (getState().gameMode === 'online') return; // Cannot replay while online
+
+    setState({ gameStatus: 'replay' });
+    hideAllPopups();
+    currentReplay = replayData;
+    currentReplayStep = 0;
+
+    const controls = document.getElementById('replayControlsBar');
+    if (controls) controls.style.display = 'flex';
+    setTurnIndicator('📺 Replay Mode');
+
+    const btn = document.getElementById('replayPlayPauseBtn');
+    if (btn) btn.textContent = '⏯';
+
+    renderReplayStep();
+}
+
+function exitReplay() {
+    if (replayInterval) {
+        clearInterval(replayInterval);
+        replayInterval = null;
+    }
+    currentReplay = null;
+    const controls = document.getElementById('replayControlsBar');
+    if (controls) controls.style.display = 'none';
+    startNewRound();
+}
+
+function refreshHistorySidebar() {
+    const replays = loadReplays();
+    renderHistoryList(replays, startReplay);
 }
 
 /* ════════════════════════ Game Flow ════════════════════════ */
@@ -638,11 +826,15 @@ function init() {
 
     updateScoreDisplay(s.playerScore, s.aiScore);
     updateStatsDisplay(s.level, s.drawStreak, s.playerWins);
+    updateEloDisplay(s.playerRating, s.rank, 0);
     updateModeLabel(s.gameMode);
     renderStatsPanel(s.stats);
 
     const sel = document.getElementById('difficulty');
     if (sel) sel.value = getDifficultyForLevel();
+
+    const pSel = document.getElementById('aiPersonality');
+    if (pSel) pSel.value = s.aiPersonality || 'perfect';
 
     const modeSel = document.getElementById('modeSelect');
     if (modeSel) modeSel.value = s.gameMode === 'online' ? 'pvai' : s.gameMode;
@@ -701,7 +893,7 @@ function init() {
 
     document.getElementById('undoBtn')?.addEventListener('click', undoLastMove);
 
-    // Hint system — show the best move
+    // Hint system — show the best move (always perfect minimax for hints)
     let hintsUsed = 0;
     document.getElementById('hintBtn')?.addEventListener('click', () => {
         const s = getState();
@@ -710,7 +902,7 @@ function init() {
             document.getElementById('hintBtn').textContent = '💡 No hints left';
             return;
         }
-        const bestIdx = getAIMove(s.board, 'hard', 'X', 'O');
+        const bestIdx = getAIMove(s.board, 'hard', 'X', 'O', 'perfect');
         if (bestIdx < 0) return;
         const cell = document.querySelector(`.cell[data-index="${bestIdx}"]`);
         if (cell) {
@@ -749,6 +941,12 @@ function init() {
         setState({ soundEnabled: enabled });
         persistState();
     });
+
+    document.getElementById('aiPersonality')?.addEventListener('change', (e) => {
+        setState({ aiPersonality: e.target.value });
+        persistState();
+    });
+
     sel?.addEventListener('change', (e) => {
         const diff = e.target.value;
         setState({
@@ -771,6 +969,23 @@ function init() {
     document.getElementById('statsClose')?.addEventListener('click', () => {
         document.getElementById('statsSidebar')?.classList.remove('open');
     });
+
+    // History sidebar toggle
+    document.getElementById('historyToggle')?.addEventListener('click', () => {
+        document.getElementById('historySidebar')?.classList.toggle('open');
+        refreshHistorySidebar();
+    });
+    document.getElementById('historyClose')?.addEventListener('click', () => {
+        document.getElementById('historySidebar')?.classList.remove('open');
+    });
+
+    // Replay mode buttons
+    document.getElementById('replayPrevBtn')?.addEventListener('click', replayPrev);
+    document.getElementById('replayPlayPauseBtn')?.addEventListener('click', toggleReplayPlay);
+    document.getElementById('replayNextBtn')?.addEventListener('click', replayNext);
+    document.getElementById('replayExitBtn')?.addEventListener('click', exitReplay);
+
+    refreshHistorySidebar();
 }
 
 document.addEventListener('DOMContentLoaded', init);
