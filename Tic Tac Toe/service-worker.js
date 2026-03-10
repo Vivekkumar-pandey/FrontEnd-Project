@@ -3,7 +3,7 @@
  * Tic Tac Toe Neon Arena PWA
  */
 
-const CACHE_NAME = 'ttt-neon-v4';
+const CACHE_NAME = 'ttt-neon-v5';
 const ASSETS = [
     './',
     './index.html',
