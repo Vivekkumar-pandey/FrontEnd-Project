@@ -533,7 +533,7 @@ function startNewRound() {
     createBoard();
     setState({ gameStatus: 'playing', isAIThinking: false });
     timer.start();
-    trackEvent('game_start', { mode: getState().gameMode, difficulty: getDifficultyForLevel() });
+    trackEvent('game_start', { mode: getState().gameMode, difficulty: getState().aiPersonality });
     updateTurnUI();
 }
 
