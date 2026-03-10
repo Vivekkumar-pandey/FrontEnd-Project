@@ -33,11 +33,25 @@ const timer = createTimer(sec => setTimerDisplay(sec));
 
 /* ════════════════════════ Helpers ════════════════════════ */
 
+const difficultyToLevel = {
+    easy: 1,
+    medium: 2,
+    hard: 3
+};
+
 function getDifficultyForLevel() {
     const s = getState();
     if (s.level <= 1) return 'easy';
     if (s.level <= 2) return 'medium';
     return 'hard';
+}
+
+function resolveDifficulty() {
+    const s = getState();
+    if (s.manualDifficulty) {
+        return s.difficulty;
+    }
+    return getDifficultyForLevel();
 }
 
 function persistState() {
@@ -49,6 +63,7 @@ function persistState() {
         totalDraws: s.totalDraws,
         consecutiveDraws: s.consecutiveDraws,
         difficulty: s.difficulty,
+        manualDifficulty: s.manualDifficulty,
         theme: s.theme,
         gameMode: s.gameMode === 'online' ? 'pvai' : s.gameMode,
         soundEnabled: s.soundEnabled,
@@ -181,7 +196,8 @@ function makeMove(index, mark) {
         setTimeout(() => {
             const cur = getState();
             if (cur.gameStatus !== 'playing') return;
-            const difficulty = getDifficultyForLevel();
+            const difficulty = resolveDifficulty();
+            console.log("Resolved AI difficulty:", difficulty); // Temporary log for validation
             const aiIdx = getAIMove(cur.board, difficulty, 'O', 'X');
             setState({ isAIThinking: false });
             makeMove(aiIdx, 'O');
@@ -323,7 +339,12 @@ function updateLevel(outcome) {
         newLevel = 6; newProgress = 0; newConsecDraws = 0;
     }
 
-    setState({ level: newLevel, levelProgress: newProgress, consecutiveDraws: newConsecDraws });
+    setState({
+        level: newLevel,
+        levelProgress: newProgress,
+        consecutiveDraws: newConsecDraws,
+        manualDifficulty: false // Revert control back to level progression on advancing
+    });
 
     if (newLevel !== prevLevel && newLevel < 6) {
         playLevelUpSound();
@@ -337,7 +358,9 @@ function updateLevel(outcome) {
     }
 
     const sel = document.getElementById('difficulty');
-    if (sel) sel.value = getDifficultyForLevel();
+    if (sel && !getState().manualDifficulty) {
+        sel.value = getDifficultyForLevel();
+    }
 
     const cur = getState();
     updateStatsDisplay(cur.level, cur.totalDraws, cur.consecutiveDraws);
@@ -674,7 +697,16 @@ function init() {
         setState({ soundEnabled: enabled });
         persistState();
     });
-    sel?.addEventListener('change', (e) => { setState({ difficulty: e.target.value }); persistState(); });
+    sel?.addEventListener('change', (e) => {
+        const diff = e.target.value;
+        setState({
+            difficulty: diff,
+            level: difficultyToLevel[diff] || 1, // Instantly set the correct level text
+            manualDifficulty: true
+        });
+        persistState();
+        restartGame(); // Restart game smoothly with new difficulty overriding the AI logic
+    });
     modeSel?.addEventListener('change', (e) => setGameMode(e.target.value));
     document.querySelectorAll('.theme-btn').forEach(btn => {
         btn.addEventListener('click', () => { setState({ theme: btn.dataset.theme }); applyTheme(btn.dataset.theme); persistState(); });

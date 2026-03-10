@@ -19,6 +19,7 @@ function defaultState() {
         totalDraws: 0,
         consecutiveDraws: 0,
         difficulty: 'easy',
+        manualDifficulty: false,
         theme: 'dark',
         gameMode: 'pvai',
         soundEnabled: true,

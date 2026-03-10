@@ -25,6 +25,7 @@ const initialState = {
     totalDraws: 0,
     consecutiveDraws: 0,
     difficulty: 'easy',
+    manualDifficulty: false,
 
     // Lifetime statistics
     stats: {
