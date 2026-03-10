@@ -18,6 +18,7 @@ function defaultState() {
         level: 1,
         totalDraws: 0,
         consecutiveDraws: 0,
+        hardWins: 0,
         difficulty: 'easy',
         manualDifficulty: false,
         theme: 'dark',

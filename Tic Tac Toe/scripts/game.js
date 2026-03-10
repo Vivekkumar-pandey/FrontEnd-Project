@@ -60,6 +60,7 @@ function persistState() {
         playerScore: s.playerScore,
         aiScore: s.aiScore,
         level: s.level,
+        hardWins: s.hardWins,
         totalDraws: s.totalDraws,
         consecutiveDraws: s.consecutiveDraws,
         difficulty: s.difficulty,
@@ -224,14 +225,13 @@ function handleWin(mark) {
             setState({
                 gameStatus: 'won',
                 playerScore: s.playerScore + 1,
-                levelProgress: s.levelProgress + 1,
                 consecutiveDraws: 0,
                 stats: newStats,
             });
             updateLevel('win');
             playWinSound();
             launchConfetti(3500);
-            trackEvent('game_win', { difficulty: getDifficultyForLevel(), duration });
+            trackEvent('game_win', { difficulty: resolveDifficulty(), duration });
             setTimeout(() => showPopup('winPopup'), 500);
         } else {
             const newStats = { ...s.stats };
@@ -243,11 +243,11 @@ function handleWin(mark) {
                 gameStatus: 'lost',
                 aiScore: s.aiScore + 1,
                 consecutiveDraws: 0,
-                levelProgress: 0,
                 stats: newStats,
             });
             playLoseSound();
-            trackEvent('game_loss', { difficulty: getDifficultyForLevel(), duration });
+            updateLevel('loss');
+            trackEvent('game_loss', { difficulty: resolveDifficulty(), duration });
             setTimeout(() => showPopup('aiWinPopup'), 500);
         }
     } else if (s.gameMode === 'online') {
@@ -303,7 +303,7 @@ function handleDraw() {
     });
 
     playDrawSound();
-    trackEvent('game_draw', { difficulty: getDifficultyForLevel(), duration });
+    trackEvent('game_draw', { difficulty: resolveDifficulty(), duration });
 
     if (s.gameMode === 'pvai') {
         updateLevel('draw');
@@ -322,35 +322,35 @@ function updateLevel(outcome) {
     const s = getState();
     const prevLevel = s.level;
     let newLevel = s.level;
-    let newProgress = s.levelProgress;
-    let newConsecDraws = s.consecutiveDraws;
+    let hardWins = s.hardWins;
 
-    if (newLevel === 1 && outcome === 'win' && newProgress >= 5) {
-        newLevel = 2; newProgress = 0; newConsecDraws = 0;
-    } else if (newLevel === 2 && outcome === 'win' && newProgress >= 10) {
-        newLevel = 3; newProgress = 0; newConsecDraws = 0;
+    // Track Hard-level wins
+    if (outcome === 'win' && s.level === 3) hardWins++;
+
+    // Level 1 → 2: player must have 5-game win advantage
+    if (newLevel === 1 && (s.playerScore - s.aiScore) >= 5) {
+        newLevel = 2;
     }
-
-    if (outcome === 'draw' && newLevel < 3 && newConsecDraws >= 5) {
-        newLevel++; newProgress = 0; newConsecDraws = 0;
+    // Level 2 → 3: player must have 7-game win advantage
+    if (newLevel === 2 && (s.playerScore - s.aiScore) >= 7) {
+        newLevel = 3;
     }
-
-    if (newLevel === 3 && outcome === 'draw' && newConsecDraws >= 7) {
-        newLevel = 6; newProgress = 0; newConsecDraws = 0;
+    // Level 3 → 4 (Champion): 10 hard wins OR 7 consecutive draws
+    if (newLevel === 3 && (hardWins >= 10 || s.consecutiveDraws >= 7)) {
+        newLevel = 4;
     }
 
     setState({
         level: newLevel,
-        levelProgress: newProgress,
-        consecutiveDraws: newConsecDraws,
+        hardWins,
         manualDifficulty: false // Revert control back to level progression on advancing
     });
 
-    if (newLevel !== prevLevel && newLevel < 6) {
+    if (newLevel !== prevLevel && newLevel < 4) {
         playLevelUpSound();
         trackEvent('level_up', { level: newLevel });
         showLevelUpPopup(newLevel);
-    } else if (newLevel === 6) {
+    } else if (newLevel === 4) {
         playLevelUpSound();
         launchConfetti(5000);
         trackEvent('champion');
@@ -364,12 +364,14 @@ function updateLevel(outcome) {
 
     const cur = getState();
     updateStatsDisplay(cur.level, cur.totalDraws, cur.consecutiveDraws);
+
+    console.log(`[Progression] Level: ${cur.level}, Advantage: ${cur.playerScore - cur.aiScore}, HardWins: ${cur.hardWins}, ConsecDraws: ${cur.consecutiveDraws}`);
 }
 
 function showLevelUpPopup(level) {
-    const names = ['', 'EASY', 'MEDIUM', 'HARD', 'HARD+', 'EXPERT', 'CHAMPION'];
+    const names = ['', 'EASY', 'MEDIUM', 'HARD', 'CHAMPION'];
     const el = document.getElementById('levelUpText');
-    if (el) el.textContent = `You've advanced to ${names[level]}!`;
+    if (el) el.textContent = `You've advanced to ${names[level] || 'CHAMPION'}!`;
     showPopup('levelUpPopup');
 }
 
