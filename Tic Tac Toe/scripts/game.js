@@ -862,20 +862,38 @@ function init() {
 
     /* ──── Button wiring ──── */
 
-    document.getElementById('startGameBtn')?.addEventListener('click', () => { hidePopup('instructionsPopup'); startNewRound(); });
+    const bindTap = (id, handler) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const wrapper = (e) => {
+            if (e.type === 'touchstart') {
+                e.preventDefault(); // prevent duplicate click
+            }
+            handler(e);
+        };
+        btn.addEventListener('click', wrapper);
+        btn.addEventListener('touchstart', wrapper, { passive: false });
+    };
+
+    bindTap('startGameBtn', () => { hidePopup('instructionsPopup'); startNewRound(); });
+
     ['winPopupOk', 'aiWinPopupOk', 'drawPopupOk', 'levelUpOk'].forEach(id => {
-        document.getElementById(id)?.addEventListener('click', startNewRound);
+        bindTap(id, startNewRound);
     });
-    document.getElementById('pvpWinPopupOk')?.addEventListener('click', () => {
+
+    bindTap('pvpWinPopupOk', () => {
         if (getState().gameMode === 'online' && isConnected()) sendRestart();
         startNewRound();
     });
-    document.getElementById('championPopupOk')?.addEventListener('click', restartGame);
-    document.getElementById('restart')?.addEventListener('click', () => {
+
+    bindTap('championPopupOk', restartGame);
+
+    bindTap('restart', () => {
         if (getState().gameMode === 'online' && isConnected()) sendRestart();
         startNewRound();
     });
-    document.getElementById('quit')?.addEventListener('click', () => {
+
+    bindTap('quit', () => {
         if (getState().gameMode === 'online') disconnect(true); // notifyRemote
         setGameMode('pvai');
         restartGame();
