@@ -6,10 +6,10 @@
  */
 
 import { checkWinner, isBoardFull, createTimer } from './utils.js';
-import { getState, setState, subscribe, resetGameState, resetAllScores } from './state.js';
+import { getState, setState, subscribe, resetGameState, resetAllScores, calculateRank } from './state.js';
 import { getRoomCode } from './multiplayer.js';
 import { getAIMove } from './ai.js';
-import { loadState, saveState, loadStats, saveStats, saveReplay, loadReplays } from './storage.js';
+import { loadState, saveState, loadStats, saveStats } from './storage.js';
 import {
     playMoveSound, playWinSound, playLoseSound, playDrawSound, playLevelUpSound,
     launchConfetti, initParticleBackground, applyTheme,
@@ -18,8 +18,8 @@ import {
     showPopup, hidePopup, hideAllPopups,
     setTimerDisplay, updateModeLabel, updateRoomInfoBar,
     toggleSound, setSoundEnabled,
-    renderStatsPanel, renderHistoryList,
-    shakeBoard, updateEloDisplay,
+    renderStatsPanel,
+    shakeBoard,
 } from './ui.js';
 import {
     createRoom, joinRoom, sendMove, sendRestart, sendLeave,
@@ -34,26 +34,7 @@ const timer = createTimer(sec => setTimerDisplay(sec));
 
 /* ════════════════════════ Helpers ════════════════════════ */
 
-const difficultyToLevel = {
-    easy: 1,
-    medium: 2,
-    hard: 3
-};
-
-function getDifficultyForLevel() {
-    const s = getState();
-    if (s.level <= 1) return 'easy';
-    if (s.level <= 2) return 'medium';
-    return 'hard';
-}
-
-function resolveDifficulty() {
-    const s = getState();
-    if (s.manualDifficulty) {
-        return s.difficulty;
-    }
-    return getDifficultyForLevel();
-}
+const AI_TIERS = ['random', 'defensive', 'aggressive', 'perfect'];
 
 function persistState() {
     const s = getState();
@@ -69,6 +50,11 @@ function persistState() {
         theme: s.theme,
         gameMode: s.gameMode === 'online' ? 'pvai' : s.gameMode,
         soundEnabled: s.soundEnabled,
+        playerRating: s.playerRating,
+        rank: s.rank,
+        aiPersonality: s.aiPersonality,
+        adaptiveDifficulty: s.adaptiveDifficulty,
+        matchHistory: s.matchHistory,
     });
     saveStats(s.stats);
 }
@@ -100,6 +86,7 @@ function createBoard() {
 }
 
 function handleCellKeydown(e) {
+    if (replayMode) return;
     const idx = parseInt(e.target.dataset.index);
     if (isNaN(idx)) return;
 
@@ -145,6 +132,7 @@ function updateTurnUI() {
 /* ════════════════════════ Move Handling ════════════════════════ */
 
 function handleCellClick(e) {
+    if (replayMode) return;
     const cellEl = e.target.closest('.cell');
     if (!cellEl) return;
     const index = parseInt(cellEl.dataset.index);
@@ -198,9 +186,9 @@ function makeMove(index, mark) {
         setTimeout(() => {
             const cur = getState();
             if (cur.gameStatus !== 'playing') return;
-            const difficulty = resolveDifficulty();
-            console.log("Resolved AI difficulty:", difficulty); // Temporary log for validation
-            const aiIdx = getAIMove(cur.board, difficulty, 'O', 'X', cur.aiPersonality);
+            const aiPersonality = cur.aiPersonality;
+            console.log("Resolved AI personality:", aiPersonality); // Temporary log for validation
+            const aiIdx = getAIMove(cur.board, aiPersonality, 'O', 'X');
             setState({ isAIThinking: false });
             makeMove(aiIdx, 'O');
         }, 450);
@@ -208,20 +196,6 @@ function makeMove(index, mark) {
 }
 
 /* ════════════════════════ Outcomes ════════════════════════ */
-
-function recordMatchReplay(outcome) {
-    const s = getState();
-    if (s.moveHistory.length === 0) return;
-
-    saveReplay({
-        id: Date.now(),
-        date: new Date().toLocaleDateString(),
-        mode: s.gameMode,
-        difficulty: resolveDifficulty(),
-        moves: [...s.moveHistory],
-        outcome: outcome
-    });
-}
 
 function handleWin(mark) {
     const s = getState();
@@ -242,14 +216,12 @@ function handleWin(mark) {
                 playerScore: s.playerScore + 1,
                 playerWins: s.playerWins + 1,
                 stats: newStats,
-                adaptiveWinStreak: s.adaptiveWinStreak + 1,
-                adaptiveLossStreak: 0,
             });
-            // drawStreak is NOT reset on player win — only on AI win
-            updateLevel('win');
+            // Update ELO & Progression
+            updateProgression('win');
             playWinSound();
             launchConfetti(3500);
-            trackEvent('game_win', { difficulty: resolveDifficulty(), duration });
+            trackEvent('game_win', { aiPersonality: s.aiPersonality, duration });
             setTimeout(() => showPopup('winPopup'), 500);
         } else {
             const newStats = { ...s.stats };
@@ -262,16 +234,14 @@ function handleWin(mark) {
                 aiScore: s.aiScore + 1,
                 drawStreak: 0, // AI win resets draw streak
                 stats: newStats,
-                adaptiveLossStreak: s.adaptiveLossStreak + 1,
-                adaptiveWinStreak: 0,
             });
             playLoseSound();
             shakeBoard(); // Visual feedback on loss
-            updateElo('loss');
-            updateLevel('loss');
-            trackEvent('game_loss', { difficulty: resolveDifficulty(), duration });
+            updateProgression('loss');
+            trackEvent('game_loss', { aiPersonality: s.aiPersonality, duration });
             setTimeout(() => showPopup('aiWinPopup'), 500);
         }
+        saveMatchHistory(mark === 'X' ? 'win' : 'loss');
     } else if (s.gameMode === 'online') {
         const iWon = mark === s.myMark;
         setState({
@@ -301,10 +271,6 @@ function handleWin(mark) {
     }
 
     const cur = getState();
-    if (s.gameMode === 'pvai') updateElo('win');
-
-    recordMatchReplay(`${mark} wins`);
-
     updateScoreDisplay(cur.playerScore, cur.aiScore);
     updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
     renderStatsPanel(cur.stats);
@@ -328,146 +294,214 @@ function handleDraw() {
     });
 
     playDrawSound();
-    trackEvent('game_draw', { difficulty: resolveDifficulty(), duration });
+    trackEvent('game_draw', { aiPersonality: s.aiPersonality, duration });
 
     if (s.gameMode === 'pvai') {
-        updateElo('draw');
-        updateLevel('draw');
+        updateProgression('draw');
+        saveMatchHistory('draw');
     }
 
     const cur = getState();
-    recordMatchReplay('draw');
     updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
     renderStatsPanel(cur.stats);
     setTimeout(() => showPopup('drawPopup'), 300);
     persistState();
 }
 
-/* ════════════════════════ Levelling & ELO ════════════════════════ */
+/* ════════════════════════ Levelling ════════════════════════ */
 
-function updateElo(outcome) {
+function updateProgression(outcome) {
     const s = getState();
-    if (s.gameMode !== 'pvai') return;
+    let ratingDelta = 0;
 
-    // Outcome point deltas per ai difficulty
-    const eloDeltas = {
-        easy: { win: 10, loss: -25, draw: -5 },
-        medium: { win: 15, loss: -20, draw: 0 },
-        hard: { win: 25, loss: -15, draw: 5 }
-    };
-
-    const diff = resolveDifficulty();
-    const map = eloDeltas[diff] || eloDeltas.medium;
-    let change = map[outcome] || 0;
-
-    let newRating = Math.max(0, s.playerRating + change);
-
-    // Determine new rank
-    let rankName = 'Beginner';
-    if (newRating >= 1600) rankName = 'Grandmaster';
-    else if (newRating >= 1400) rankName = 'Master';
-    else if (newRating >= 1200) rankName = 'Advanced';
-    else if (newRating >= 1000) rankName = 'Intermediate';
-
-    setState({ playerRating: newRating, rank: rankName });
-    updateEloDisplay(newRating, rankName, change);
-}
-
-function updateLevel(outcome) {
-    const s = getState();
-    const prevLevel = s.level;
-    let newLevel = s.level;
-    let hardWins = s.hardWins;
-
-    // Track Hard-level wins
-    if (outcome === 'win' && s.level === 3) hardWins++;
-
-    // Level 1 → 2: player wins >= 5
-    if (newLevel === 1 && s.playerWins >= 5) {
-        newLevel = 2;
-    }
-    // Level 2 → 3: player wins >= 7 OR drawStreak >= 5
-    if (newLevel === 2 && (s.playerWins >= 7 || s.drawStreak >= 5)) {
-        newLevel = 3;
-    }
-    // Level 3 → 4 (Champion): hardWins >= 10 OR drawStreak >= 7
-    if (newLevel === 3 && (hardWins >= 10 || s.drawStreak >= 7)) {
-        newLevel = 4;
+    // 1. Calculate ELO Changes
+    if (outcome === 'win') {
+        if (s.aiPersonality === 'perfect') ratingDelta = 25;
+        else if (s.aiPersonality === 'aggressive' || s.aiPersonality === 'defensive') ratingDelta = 15;
+        else ratingDelta = 5;
+    } else if (outcome === 'loss') {
+        if (s.aiPersonality === 'perfect') ratingDelta = -10;
+        else if (s.aiPersonality === 'aggressive' || s.aiPersonality === 'defensive') ratingDelta = -15;
+        else ratingDelta = -25;
+    } else if (outcome === 'draw') {
+        if (s.aiPersonality === 'perfect') ratingDelta = 10;
+        else if (s.aiPersonality === 'aggressive' || s.aiPersonality === 'defensive') ratingDelta = 5;
+        else ratingDelta = -5;
     }
 
-    // Reset draw streak on level-up to keep things clean
-    const newDrawStreak = (newLevel !== prevLevel) ? 0 : s.drawStreak;
+    // 2. Determine New Rank
+    const prevRating = s.playerRating;
+    const newRating = Math.max(0, prevRating + ratingDelta);
+    const prevRank = s.rank;
+    const newRank = calculateRank(newRating);
 
+    // 3. Dynamic Difficulty Adjustment (DDA)
+    let newWinStreak = outcome === 'win' ? s.winStreak + 1 : 0;
+    let newLossStreak = outcome === 'loss' ? s.lossStreak + 1 : 0;
+    let newPersonality = s.aiPersonality;
+
+    if (outcome === 'draw') {
+        newWinStreak = 0;
+        newLossStreak = 0;
+    }
+
+    if (s.adaptiveDifficulty) {
+        const curTierIdx = AI_TIERS.indexOf(s.aiPersonality);
+        if (newWinStreak >= 4 && curTierIdx < AI_TIERS.length - 1) {
+            newPersonality = AI_TIERS[curTierIdx + 1];
+            newWinStreak = 0; // Reset after promotion
+            trackEvent('dda_increase', { to: newPersonality });
+        } else if (newLossStreak >= 3 && curTierIdx > 0) {
+            newPersonality = AI_TIERS[curTierIdx - 1];
+            newLossStreak = 0; // Reset after demotion
+            trackEvent('dda_decrease', { to: newPersonality });
+        }
+    }
+
+    // Update State
     setState({
-        level: newLevel,
-        hardWins,
-        drawStreak: newDrawStreak,
-        manualDifficulty: false
+        playerRating: newRating,
+        rank: newRank,
+        winStreak: newWinStreak,
+        lossStreak: newLossStreak,
+        aiPersonality: newPersonality
     });
 
-    if (newLevel !== prevLevel && newLevel < 4) {
+    // Handle Rank Up popups (prevent alert spam on deranks)
+    const ranks = ['Beginner', 'Intermediate', 'Advanced', 'Master', 'Grandmaster'];
+    if (ranks.indexOf(newRank) > ranks.indexOf(prevRank)) {
         playLevelUpSound();
-        trackEvent('level_up', { level: newLevel });
-        showLevelUpPopup(newLevel);
-    } else if (newLevel === 4 && prevLevel !== 4) {
+        launchConfetti(4000);
+        showRankUpPopup(newRank);
+    } else if (newRank === 'Grandmaster' && prevRank !== 'Grandmaster') {
         playLevelUpSound();
         launchConfetti(5000);
         trackEvent('champion');
         setTimeout(() => showPopup('championPopup'), 600);
     }
 
+    // Update UI Elements
+    const sel = document.getElementById('aiPersonality');
+    if (sel && s.adaptiveDifficulty) sel.value = newPersonality;
 
-    const cur = getState();
-    updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
-
-    console.log(`[Progression] Level: ${cur.level}, PlayerWins: ${cur.playerWins}, HardWins: ${cur.hardWins}, DrawStreak: ${cur.drawStreak}`);
+    updateStatsDisplay(newRank, newRating, s.playerWins);
+    console.log(`[ELO] Rating: ${newRating} (${ratingDelta > 0 ? '+' + ratingDelta : ratingDelta}) | Rank: ${newRank} | DDA Streak [W:${newWinStreak} L:${newLossStreak}]`);
 }
 
-/**
- * Determine the actual difficulty to play.
- * If manualDifficulty is set, use that, otherwise level-based.
- */
-function resolveDifficulty() {
-    const s = getState();
-    let baseDifficulty = s.manualDifficulty ? s.difficulty : getDifficultyForLevel();
-
-    // Apply Dynamic Difficulty Adjustment (DDA)
-    if (s.adaptiveDifficulty && s.gameMode === 'pvai') {
-        const levels = ['easy', 'medium', 'hard'];
-        let idx = levels.indexOf(baseDifficulty);
-
-        // Promote if crushing it
-        if (idx < 2 && s.adaptiveWinStreak >= 4) {
-            return levels[idx + 1];
-        }
-        // Demote if struggling
-        if (idx > 0 && s.adaptiveLossStreak >= 3) {
-            return levels[idx - 1];
-        }
-    }
-
-    return baseDifficulty;
-}
-
-function getDifficultyForLevel() {
-    const s = getState();
-    switch (s.level) {
-        case 1: return 'easy';
-        case 2: return 'medium';
-        default: return 'hard';
-    }
-}
-
-function showLevelUpPopup(level) {
-    const names = ['', 'EASY', 'MEDIUM', 'HARD', 'CHAMPION'];
+function showRankUpPopup(newRank) {
+    const titleEl = document.getElementById('levelUpTitle');
+    if (titleEl) titleEl.textContent = '⬆️ Rank Up!';
     const el = document.getElementById('levelUpText');
-    if (el) el.textContent = `You've advanced to ${names[level] || 'CHAMPION'}!`;
+    if (el) el.textContent = `Awesome! You've advanced to ${newRank}!`;
     showPopup('levelUpPopup');
+}
+
+/* ════════════════════════ Match History & Replay ════════════════════════ */
+
+function saveMatchHistory(outcome) {
+    const s = getState();
+    const match = {
+        id: Date.now(),
+        date: new Date().toLocaleDateString(),
+        outcome: outcome,
+        aiPersonality: s.aiPersonality,
+        moves: [...s.moveHistory]
+    };
+
+    const newHistory = [match, ...s.matchHistory].slice(0, 50);
+    setState({ matchHistory: newHistory });
+    renderMatchHistory(newHistory);
+}
+
+let replayMode = false;
+let currentReplayMatch = null;
+let currentReplayStep = 0;
+
+window.startReplay = function (matchId) {
+    const s = getState();
+    const match = s.matchHistory.find(m => m.id === matchId);
+    if (!match) return;
+
+    replayMode = true;
+    currentReplayMatch = match;
+    currentReplayStep = 0;
+
+    let bar = document.getElementById('replayControls');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'replayControls';
+        bar.className = 'replay-bar';
+        bar.innerHTML = `
+            <button id="replayPrev" class="btn btn-sm">⏮ Back</button>
+            <button id="replayNext" class="btn btn-sm">⏭ Next</button>
+            <button id="replayExit" class="btn btn-sm">❌ Exit</button>
+        `;
+        document.querySelector('.game-area').appendChild(bar);
+
+        document.getElementById('replayPrev').addEventListener('click', () => stepReplay(-1));
+        document.getElementById('replayNext').addEventListener('click', () => stepReplay(1));
+        document.getElementById('replayExit').addEventListener('click', exitReplay);
+    }
+    bar.classList.add('active');
+
+    hideAllPopups();
+    document.getElementById('historySidebar')?.classList.remove('open');
+
+    renderReplayStep();
+};
+
+function stepReplay(dir) {
+    if (!currentReplayMatch) return;
+    currentReplayStep += dir;
+    if (currentReplayStep < 0) currentReplayStep = 0;
+    if (currentReplayStep > currentReplayMatch.moves.length) currentReplayStep = currentReplayMatch.moves.length;
+    renderReplayStep();
+}
+
+function renderReplayStep() {
+    const moves = currentReplayMatch.moves.slice(0, currentReplayStep);
+    const board = Array(9).fill('');
+    moves.forEach(m => board[m.index] = m.mark);
+
+    const cells = document.querySelectorAll('.cell');
+    cells.forEach((cell, idx) => {
+        cell.className = 'cell';
+        cell.innerHTML = '';
+        const mark = board[idx];
+        if (mark) {
+            const span = document.createElement('span');
+            span.className = `mark mark-${mark.toLowerCase()} appear`;
+            span.textContent = mark;
+            cell.appendChild(span);
+        }
+    });
+}
+
+function exitReplay() {
+    replayMode = false;
+    currentReplayMatch = null;
+    const bar = document.getElementById('replayControls');
+    if (bar) bar.classList.remove('active');
+
+    const s = getState();
+    const cells = document.querySelectorAll('.cell');
+    cells.forEach((cell, idx) => {
+        cell.className = 'cell';
+        cell.innerHTML = '';
+        const mark = s.board[idx];
+        if (mark) {
+            const span = document.createElement('span');
+            span.className = `mark mark-${mark.toLowerCase()} appear`;
+            span.textContent = mark;
+            cell.appendChild(span);
+        }
+    });
 }
 
 /* ════════════════════════ Undo ════════════════════════ */
 
 function undoLastMove() {
+    if (replayMode) return;
     const s = getState();
     if (s.gameStatus !== 'playing' || s.moveHistory.length === 0) return;
     if (s.isAIThinking) return;
@@ -490,110 +524,6 @@ function undoLastMove() {
 
     setState({ board: newBoard, moveHistory: newHistory, currentPlayer: 'X' });
     updateTurnUI();
-}
-
-/* ════════════════════════ Match Replay ════════════════════════ */
-
-let currentReplay = null;
-let currentReplayStep = 0;
-let replayInterval = null;
-
-function renderReplayStep() {
-    if (!currentReplay) return;
-
-    document.querySelectorAll('.cell').forEach(cell => {
-        cell.innerHTML = '';
-        cell.classList.remove('win-cell', 'hint-glow');
-    });
-
-    const b = Array(9).fill('');
-    for (let i = 0; i < currentReplayStep; i++) {
-        const move = currentReplay.moves[i];
-        const cell = document.querySelector(`.cell[data-index="${move.index}"]`);
-        if (cell) renderMark(cell, move.mark);
-        b[move.index] = move.mark;
-    }
-
-    const prevBtn = document.getElementById('replayPrevBtn');
-    const nextBtn = document.getElementById('replayNextBtn');
-    if (prevBtn) prevBtn.disabled = currentReplayStep === 0;
-    if (nextBtn) nextBtn.disabled = currentReplayStep === currentReplay.moves.length;
-
-    if (currentReplayStep === currentReplay.moves.length) {
-        const winComboX = checkWinner(b, 'X');
-        const winComboO = checkWinner(b, 'O');
-        if (winComboX) highlightWinningCells(winComboX);
-        if (winComboO) highlightWinningCells(winComboO);
-        if (replayInterval) toggleReplayPlay();
-    }
-}
-
-function replayNext() {
-    if (currentReplay && currentReplayStep < currentReplay.moves.length) {
-        currentReplayStep++;
-        playMoveSound();
-        renderReplayStep();
-    }
-}
-
-function replayPrev() {
-    if (currentReplay && currentReplayStep > 0) {
-        currentReplayStep--;
-        renderReplayStep();
-    }
-}
-
-function toggleReplayPlay() {
-    const btn = document.getElementById('replayPlayPauseBtn');
-    if (replayInterval) {
-        clearInterval(replayInterval);
-        replayInterval = null;
-        if (btn) btn.textContent = '⏯';
-    } else {
-        if (currentReplayStep === currentReplay.moves.length) {
-            currentReplayStep = 0; // Restart if at end
-            renderReplayStep();
-        }
-        if (btn) btn.textContent = '⏸';
-        replayInterval = setInterval(() => {
-            replayNext();
-            if (currentReplayStep >= currentReplay.moves.length) toggleReplayPlay();
-        }, 800);
-    }
-}
-
-function startReplay(replayData) {
-    if (getState().gameMode === 'online') return; // Cannot replay while online
-
-    setState({ gameStatus: 'replay' });
-    hideAllPopups();
-    currentReplay = replayData;
-    currentReplayStep = 0;
-
-    const controls = document.getElementById('replayControlsBar');
-    if (controls) controls.style.display = 'flex';
-    setTurnIndicator('📺 Replay Mode');
-
-    const btn = document.getElementById('replayPlayPauseBtn');
-    if (btn) btn.textContent = '⏯';
-
-    renderReplayStep();
-}
-
-function exitReplay() {
-    if (replayInterval) {
-        clearInterval(replayInterval);
-        replayInterval = null;
-    }
-    currentReplay = null;
-    const controls = document.getElementById('replayControlsBar');
-    if (controls) controls.style.display = 'none';
-    startNewRound();
-}
-
-function refreshHistorySidebar() {
-    const replays = loadReplays();
-    renderHistoryList(replays, startReplay);
 }
 
 /* ════════════════════════ Game Flow ════════════════════════ */
@@ -660,6 +590,14 @@ function setGameMode(mode) {
         if (quitBtn) quitBtn.style.display = 'none';
         updateModeLabel('online');
         updateRoomInfoBar('—', 1, 'Lobby');
+
+        // Reset lobby visual state
+        const createBtn = document.getElementById('lobbyCreateBtn');
+        const joinBtn = document.getElementById('lobbyJoinBtn');
+        if (createBtn) createBtn.disabled = false;
+        if (joinBtn) joinBtn.disabled = false;
+
+        hideAllPopups();
         showPopup('lobbyPopup');
         return;
     }
@@ -673,8 +611,12 @@ function setGameMode(mode) {
 
 function setupMultiplayer() {
     onStatus((status, message) => {
-        const statusEl = document.getElementById('lobbyStatus');
-        const dotEl = document.getElementById('lobbyDot');
+        // Find which popup status elements to update
+        const isLobbyVisible = document.getElementById('lobbyPopup')?.classList.contains('active');
+
+        const statusEl = isLobbyVisible ? document.getElementById('lobbyStatus') : document.getElementById('roomStatusText');
+        const dotEl = isLobbyVisible ? document.getElementById('lobbyDot') : document.getElementById('roomDot');
+
         if (statusEl) statusEl.textContent = message;
         if (dotEl) {
             dotEl.className = 'status-dot';
@@ -683,17 +625,26 @@ function setupMultiplayer() {
             else dotEl.classList.add('red');
         }
 
-        // Update Room Info Bar
+        // Update Room Popup specific details
+        if (!isLobbyVisible) {
+            const pCount = status === 'connected' ? 2 : 1;
+            const rCodeEl = document.getElementById('roomPopupCode');
+            const rPlayersEl = document.getElementById('roomPopupPlayers');
+            if (rCodeEl) rCodeEl.textContent = getRoomCode() || '—';
+            if (rPlayersEl) rPlayersEl.textContent = `${pCount} / 2`;
+        }
+
+        // Update persistent game header bar
         const pCount = status === 'connected' ? 2 : 1;
         updateRoomInfoBar(getRoomCode(), pCount, message);
 
         if (status === 'connected') {
             setTimeout(() => {
-                hidePopup('lobbyPopup');
+                hideAllPopups();
                 setState({ myMark: getIsHost() ? 'X' : 'O' });
                 updateModeLabel('online');
                 startNewRound();
-            }, 800);
+            }, 1000); // Give users a second to see "2/2 connected" before jumping to game
         }
     });
 
@@ -713,27 +664,34 @@ function setupMultiplayer() {
 
             updateRoomInfoBar(getRoomCode(), 1, intentionalLeave ? 'Opponent left' : 'Disconnected');
 
-            const titleEl = document.getElementById('pvpWinTitle');
-            if (titleEl) titleEl.textContent = intentionalLeave ? '🚪 Opponent Left The Room' : '🔌 Opponent Disconnected';
-            showPopup('pvpWinPopup');
+            const isRoomPopupActive = document.getElementById('roomPopup')?.classList.contains('active');
+
+            if (isRoomPopupActive) {
+                // Return them to lobby cleanly from waiting room
+                hideAllPopups();
+                alert(intentionalLeave ? 'Opponent left the room.' : 'Opponent disconnected.');
+                showPopup('lobbyPopup');
+                disconnect(false); // clean up local peer state
+            } else {
+                // Show win/loss popup in game
+                const titleEl = document.getElementById('pvpWinTitle');
+                if (titleEl) titleEl.textContent = intentionalLeave ? '🚪 Opponent Left The Room' : '🔌 Opponent Disconnected';
+                hideAllPopups();
+                showPopup('pvpWinPopup');
+            }
         }
     });
 
     // Create room
     document.getElementById('lobbyCreateBtn')?.addEventListener('click', async () => {
-        const codeEl = document.getElementById('lobbyRoomCode');
         const createBtn = document.getElementById('lobbyCreateBtn');
-        const joinSection = document.getElementById('lobbyJoinSection');
         if (createBtn) createBtn.disabled = true;
-        if (joinSection) joinSection.style.display = 'none';
         try {
-            const code = await createRoom();
-            if (codeEl) { codeEl.textContent = code; codeEl.style.display = 'block'; }
-            const actionsEl = document.getElementById('roomActions');
-            if (actionsEl) actionsEl.style.display = '';
+            await createRoom();
+            hidePopup('lobbyPopup');
+            showPopup('roomPopup');
         } catch {
             if (createBtn) createBtn.disabled = false;
-            if (joinSection) joinSection.style.display = '';
         }
     });
 
@@ -747,12 +705,13 @@ function setupMultiplayer() {
             return;
         }
         const joinBtn = document.getElementById('lobbyJoinBtn');
-        const createSection = document.getElementById('lobbyCreateSection');
         if (joinBtn) joinBtn.disabled = true;
-        if (createSection) createSection.style.display = 'none';
-        try { await joinRoom(code); } catch {
+        try {
+            await joinRoom(code);
+            hidePopup('lobbyPopup');
+            showPopup('roomPopup');
+        } catch {
             if (joinBtn) joinBtn.disabled = false;
-            if (createSection) createSection.style.display = '';
         }
     });
 
@@ -761,33 +720,44 @@ function setupMultiplayer() {
         if (e.key === 'Enter') { e.preventDefault(); document.getElementById('lobbyJoinBtn')?.click(); }
     });
 
-    // Copy code
-    document.getElementById('copyCodeBtn')?.addEventListener('click', () => {
+    // Copy code from room popup
+    document.getElementById('roomCopyBtn')?.addEventListener('click', () => {
         const code = getRoomCode();
         if (!code) return;
         navigator.clipboard.writeText(code).then(() => {
-            const btn = document.getElementById('copyCodeBtn');
+            const btn = document.getElementById('roomCopyBtn');
             if (btn) { btn.textContent = '✅ Copied!'; setTimeout(() => { btn.textContent = '📋 Copy Code'; }, 1500); }
         });
     });
 
-    // Share link
-    document.getElementById('shareLinkBtn')?.addEventListener('click', () => {
+    // Share link from room popup
+    document.getElementById('roomShareBtn')?.addEventListener('click', () => {
         const code = getRoomCode();
         if (!code) return;
         const url = new URL(window.location.href);
         url.searchParams.set('room', code);
         url.hash = '';
         navigator.clipboard.writeText(url.toString()).then(() => {
-            const btn = document.getElementById('shareLinkBtn');
+            const btn = document.getElementById('roomShareBtn');
             if (btn) { btn.textContent = '✅ Link Copied!'; setTimeout(() => { btn.textContent = '🔗 Share Link'; }, 1500); }
         });
     });
 
-    // Leave lobby
+    // Leave Room (Pre-game lobby or active game)
+    const handleLeave = () => {
+        disconnect(true);
+        hideAllPopups();
+        const url = new URL(window.location.href);
+        url.searchParams.delete('room');
+        window.history.replaceState({}, '', url.toString());
+        setGameMode('pvai');
+    };
+
+    document.getElementById('roomLeaveBtn')?.addEventListener('click', handleLeave);
+    document.getElementById('leaveRoomBtn')?.addEventListener('click', handleLeave);
+
+    // Leave cleanly from Lobby main screen
     document.getElementById('lobbyLeaveBtn')?.addEventListener('click', () => {
-        disconnect();
-        hidePopup('lobbyPopup');
         const url = new URL(window.location.href);
         url.searchParams.delete('room');
         window.history.replaceState({}, '', url.toString());
@@ -825,16 +795,16 @@ function init() {
     if (s.soundEnabled !== undefined) setSoundEnabled(s.soundEnabled);
 
     updateScoreDisplay(s.playerScore, s.aiScore);
-    updateStatsDisplay(s.level, s.drawStreak, s.playerWins);
-    updateEloDisplay(s.playerRating, s.rank, 0);
+    updateStatsDisplay(s.rank, s.playerRating, s.playerWins);
     updateModeLabel(s.gameMode);
     renderStatsPanel(s.stats);
+    renderMatchHistory(s.matchHistory);
 
-    const sel = document.getElementById('difficulty');
-    if (sel) sel.value = getDifficultyForLevel();
+    const sel = document.getElementById('aiPersonality');
+    if (sel) sel.value = s.aiPersonality;
 
-    const pSel = document.getElementById('aiPersonality');
-    if (pSel) pSel.value = s.aiPersonality || 'perfect';
+    const ddaToggle = document.getElementById('ddaToggle');
+    if (ddaToggle) ddaToggle.checked = s.adaptiveDifficulty;
 
     const modeSel = document.getElementById('modeSelect');
     if (modeSel) modeSel.value = s.gameMode === 'online' ? 'pvai' : s.gameMode;
@@ -862,38 +832,20 @@ function init() {
 
     /* ──── Button wiring ──── */
 
-    const bindTap = (id, handler) => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        const wrapper = (e) => {
-            if (e.type === 'touchstart') {
-                e.preventDefault(); // prevent duplicate click
-            }
-            handler(e);
-        };
-        btn.addEventListener('click', wrapper);
-        btn.addEventListener('touchstart', wrapper, { passive: false });
-    };
-
-    bindTap('startGameBtn', () => { hidePopup('instructionsPopup'); startNewRound(); });
-
+    document.getElementById('startGameBtn')?.addEventListener('click', () => { hidePopup('instructionsPopup'); startNewRound(); });
     ['winPopupOk', 'aiWinPopupOk', 'drawPopupOk', 'levelUpOk'].forEach(id => {
-        bindTap(id, startNewRound);
+        document.getElementById(id)?.addEventListener('click', startNewRound);
     });
-
-    bindTap('pvpWinPopupOk', () => {
+    document.getElementById('pvpWinPopupOk')?.addEventListener('click', () => {
         if (getState().gameMode === 'online' && isConnected()) sendRestart();
         startNewRound();
     });
-
-    bindTap('championPopupOk', restartGame);
-
-    bindTap('restart', () => {
+    document.getElementById('championPopupOk')?.addEventListener('click', restartGame);
+    document.getElementById('restart')?.addEventListener('click', () => {
         if (getState().gameMode === 'online' && isConnected()) sendRestart();
         startNewRound();
     });
-
-    bindTap('quit', () => {
+    document.getElementById('quit')?.addEventListener('click', () => {
         if (getState().gameMode === 'online') disconnect(true); // notifyRemote
         setGameMode('pvai');
         restartGame();
@@ -911,7 +863,7 @@ function init() {
 
     document.getElementById('undoBtn')?.addEventListener('click', undoLastMove);
 
-    // Hint system — show the best move (always perfect minimax for hints)
+    // Hint system — show the best move
     let hintsUsed = 0;
     document.getElementById('hintBtn')?.addEventListener('click', () => {
         const s = getState();
@@ -920,7 +872,7 @@ function init() {
             document.getElementById('hintBtn').textContent = '💡 No hints left';
             return;
         }
-        const bestIdx = getAIMove(s.board, 'hard', 'X', 'O', 'perfect');
+        const bestIdx = getAIMove(s.board, 'hard', 'X', 'O');
         if (bestIdx < 0) return;
         const cell = document.querySelector(`.cell[data-index="${bestIdx}"]`);
         if (cell) {
@@ -959,21 +911,21 @@ function init() {
         setState({ soundEnabled: enabled });
         persistState();
     });
-
-    document.getElementById('aiPersonality')?.addEventListener('change', (e) => {
-        setState({ aiPersonality: e.target.value });
+    sel?.addEventListener('change', (e) => {
+        const personality = e.target.value;
+        setState({
+            aiPersonality: personality,
+            adaptiveDifficulty: false // Manual override
+        });
+        const ddaToggle = document.getElementById('ddaToggle');
+        if (ddaToggle) ddaToggle.checked = false;
         persistState();
+        restartGame();
     });
 
-    sel?.addEventListener('change', (e) => {
-        const diff = e.target.value;
-        setState({
-            difficulty: diff,
-            level: difficultyToLevel[diff] || 1, // Instantly set the correct level text
-            manualDifficulty: true
-        });
+    document.getElementById('ddaToggle')?.addEventListener('change', (e) => {
+        setState({ adaptiveDifficulty: e.target.checked });
         persistState();
-        restartGame(); // Restart game smoothly with new difficulty overriding the AI logic
     });
     modeSel?.addEventListener('change', (e) => setGameMode(e.target.value));
     document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -987,23 +939,6 @@ function init() {
     document.getElementById('statsClose')?.addEventListener('click', () => {
         document.getElementById('statsSidebar')?.classList.remove('open');
     });
-
-    // History sidebar toggle
-    document.getElementById('historyToggle')?.addEventListener('click', () => {
-        document.getElementById('historySidebar')?.classList.toggle('open');
-        refreshHistorySidebar();
-    });
-    document.getElementById('historyClose')?.addEventListener('click', () => {
-        document.getElementById('historySidebar')?.classList.remove('open');
-    });
-
-    // Replay mode buttons
-    document.getElementById('replayPrevBtn')?.addEventListener('click', replayPrev);
-    document.getElementById('replayPlayPauseBtn')?.addEventListener('click', toggleReplayPlay);
-    document.getElementById('replayNextBtn')?.addEventListener('click', replayNext);
-    document.getElementById('replayExitBtn')?.addEventListener('click', exitReplay);
-
-    refreshHistorySidebar();
 }
 
 document.addEventListener('DOMContentLoaded', init);

@@ -43,17 +43,29 @@ const initialState = {
     gameMode: 'pvai',
     soundEnabled: true,
 
-    // Advanced Systems
+    // Advanced Indie Features
     playerRating: 1000,
     rank: 'Intermediate',
     aiPersonality: 'perfect',
-    adaptiveWinStreak: 0,
-    adaptiveLossStreak: 0,
     adaptiveDifficulty: true,
+    matchHistory: [],
+    winStreak: 0,
+    lossStreak: 0,
 
     // Online
     myMark: 'X',
 };
+
+/**
+ * Calculate the named rank tier based on a numerical ELO rating.
+ */
+export function calculateRank(rating) {
+    if (rating < 1000) return 'Beginner';
+    if (rating < 1200) return 'Intermediate';
+    if (rating < 1400) return 'Advanced';
+    if (rating < 1600) return 'Master';
+    return 'Grandmaster';
+}
 
 /* ─────────── Store ─────────── */
 
@@ -137,5 +149,7 @@ export function resetAllScores() {
         playerWins: 0,
         hardWins: 0,
         drawStreak: 0,
+        winStreak: 0,
+        lossStreak: 0,
     });
 }

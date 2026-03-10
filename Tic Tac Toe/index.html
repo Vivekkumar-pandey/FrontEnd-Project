@@ -40,27 +40,19 @@
     <!-- ═══════════ HEADER ═══════════ -->
     <header class="app-header" role="banner">
       <h1>TIC TAC TOE</h1>
-      <div class="elo-badge" id="eloBadge" aria-label="Player Rating">
-        <span class="elo-icon">⭐</span>
-        <span class="elo-rating" id="ratingDisplay">1000</span>
-        <span class="elo-rank" id="rankDisplay">Intermediate</span>
-        <span id="ratingDelta" class="rating-delta" aria-hidden="true"></span>
-      </div>
     </header>
 
     <!-- ═══════════ CONTROLS ═══════════ -->
     <nav class="controls" role="toolbar" aria-label="Game controls">
-      <select id="difficulty" aria-label="AI Difficulty">
-        <option value="easy" selected>⚡ Easy</option>
-        <option value="medium">🔥 Medium</option>
-        <option value="hard">💀 Hard</option>
-      </select>
       <select id="aiPersonality" aria-label="AI Personality">
-        <option value="perfect" selected>🧠 Perfect</option>
-        <option value="aggressive">⚔️ Aggressive</option>
-        <option value="defensive">🛡️ Defensive</option>
-        <option value="random">🎲 Random</option>
+        <option value="random">🎲 Random AI</option>
+        <option value="defensive">🛡️ Defensive AI</option>
+        <option value="aggressive">⚔️ Aggressive AI</option>
+        <option value="perfect" selected>🧠 Perfect AI</option>
       </select>
+      <label class="dda-toggle" aria-label="Adaptive Difficulty">
+        <input type="checkbox" id="ddaToggle" checked> Adaptive (DDA)
+      </label>
       <select id="modeSelect" aria-label="Game Mode">
         <option value="pvai">🤖 vs AI</option>
         <option value="pvp">👥 Local PvP</option>
@@ -94,10 +86,10 @@
 
     <!-- ═══════════ STATS BAR ═══════════ -->
     <div class="stats-bar" aria-label="Game statistics">
-      <div class="stat-item" id="levelDisplay">Level: EASY</div>
+      <div class="stat-item" id="rankDisplay">🏆 Intermediate</div>
+      <div class="stat-item">ELO: <span class="value" id="eloDisplay">1000</span></div>
       <div class="stat-item" id="timer">⏱ 0s</div>
       <div class="stat-item">Wins: <span class="value" id="playerWinsDisplay">0</span></div>
-      <div class="stat-item">Draw⚡: <span class="value" id="consecutiveDraws">0</span></div>
     </div>
 
     <!-- ═══════════ ROOM INFO BAR ═══════════ -->
@@ -105,16 +97,6 @@
       <div class="stat-item">Code: <span class="value" id="roomCodeDisplay">—</span></div>
       <div class="stat-item">Players: <span class="value" id="roomPlayersCount">1 / 2</span></div>
       <div class="stat-item status-text" id="roomConnectionStatus">Waiting for opponent...</div>
-    </div>
-
-    <!-- ═══════════ REPLAY CONTROLS ═══════════ -->
-    <div class="room-info-bar replay-controls" id="replayControlsBar" aria-label="Replay Controls"
-      style="display: none; justify-content: center; gap: 15px;">
-      <button class="btn btn-icon" id="replayPrevBtn" aria-label="Previous move" style="font-size: 1.2rem;">⏮</button>
-      <button class="btn btn-icon" id="replayPlayPauseBtn" aria-label="Play or Pause"
-        style="font-size: 1.2rem;">⏯</button>
-      <button class="btn btn-icon" id="replayNextBtn" aria-label="Next move" style="font-size: 1.2rem;">⏭</button>
-      <button class="btn btn-secondary" id="replayExitBtn" style="margin-left: 20px;">Exit Replay</button>
     </div>
 
     <!-- ═══════════ TURN INDICATOR ═══════════ -->
@@ -129,23 +111,19 @@
     <footer class="app-footer" role="contentinfo">
       <div class="footer-settings">
         <span class="settings-label">Theme</span>
-        <div class="theme-switcher" role="radiogroup" aria-label="Select colour theme">
-          <button class="theme-btn active" data-theme="dark" role="radio" aria-checked="true" aria-label="Dark theme"
-            title="Dark"></button>
-          <button class="theme-btn" data-theme="light" role="radio" aria-checked="false" aria-label="Light theme"
-            title="Light"></button>
-          <button class="theme-btn" data-theme="neon" role="radio" aria-checked="false" aria-label="Neon theme"
-            title="Neon Cyber"></button>
-          <button class="theme-btn" data-theme="classic" role="radio" aria-checked="false" aria-label="Classic theme"
-            title="Classic"></button>
-          <button class="theme-btn" data-theme="wood" role="radio" aria-checked="false" aria-label="Wood theme"
-            title="Wood Board"></button>
-          <button class="theme-btn" data-theme="space" role="radio" aria-checked="false" aria-label="Space theme"
-            title="Deep Space"></button>
-        </div>
+        <button class="theme-btn active" data-theme="dark" role="radio" aria-checked="true"
+          aria-label="Dark theme"></button>
+        <button class="theme-btn" data-theme="light" role="radio" aria-checked="false"
+          aria-label="Light theme"></button>
+        <button class="theme-btn" data-theme="neon" role="radio" aria-checked="false" aria-label="Neon theme"></button>
+        <button class="theme-btn" data-theme="woodBoard" role="radio" aria-checked="false"
+          aria-label="Wood Board theme"></button>
+        <button class="theme-btn" data-theme="spaceTheme" role="radio" aria-checked="false"
+          aria-label="Space theme"></button>
       </div>
-      <p class="footer-copyright">Developed By :- Vivek Kumar &copy; 2026</p>
-    </footer>
+  </div>
+  <p class="footer-copyright">Developed By :- Vivek Kumar &copy; 2026</p>
+  </footer>
 
   </div>
   <!-- /.app-wrapper -->
@@ -233,13 +211,6 @@
       <div class="lobby-sections">
         <div class="lobby-section" id="lobbyCreateSection">
           <button class="btn btn-create" id="lobbyCreateBtn">Create Room</button>
-          <div class="room-code-display" id="lobbyRoomCode" style="display:none;" aria-live="polite"></div>
-          <div class="room-actions" id="roomActions" style="display:none;">
-            <button class="btn-icon" id="copyCodeBtn" title="Copy room code" aria-label="Copy room code">📋 Copy
-              Code</button>
-            <button class="btn-icon" id="shareLinkBtn" title="Copy join link" aria-label="Copy shareable link">🔗 Share
-              Link</button>
-          </div>
         </div>
 
         <div class="lobby-divider"><span>OR</span></div>
@@ -259,6 +230,37 @@
       </div>
 
       <button class="btn btn-leave" id="lobbyLeaveBtn">← Back</button>
+    </div>
+  </div>
+
+  <!-- Room Waiting State -->
+  <div id="roomPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="roomTitle">
+    <div class="popup-card lobby-card">
+      <h2 id="roomTitle">🏠 Game Room</h2>
+      <p class="lobby-subtitle">Waiting for players to connect...</p>
+
+      <div class="room-details">
+        <div class="room-stat">
+          <span class="room-stat-label">Room Code</span>
+          <span class="room-stat-value" id="roomPopupCode">—</span>
+        </div>
+        <div class="room-stat">
+          <span class="room-stat-label">Players</span>
+          <span class="room-stat-value" id="roomPopupPlayers">1 / 2</span>
+        </div>
+      </div>
+
+      <div class="room-actions-bar">
+        <button class="btn btn-secondary" id="roomCopyBtn">📋 Copy Code</button>
+        <button class="btn btn-secondary" id="roomShareBtn">🔗 Share Link</button>
+      </div>
+
+      <div class="lobby-status-bar">
+        <span class="status-dot yellow" id="roomDot"></span>
+        <span class="lobby-status-text" id="roomStatusText">Waiting for opponent...</span>
+      </div>
+
+      <button class="btn btn-leave" id="roomLeaveBtn">Leave Room</button>
     </div>
   </div>
 

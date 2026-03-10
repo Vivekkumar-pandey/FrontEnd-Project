@@ -305,6 +305,42 @@ const themes = {
         '--popup-bg': 'rgba(13,2,33,0.96)',
         '--overlay': 'rgba(0,0,0,0.7)',
     },
+    woodBoard: {
+        '--bg-primary': '#2c1e16',
+        '--bg-secondary': '#3e2a1e',
+        '--bg-card': 'rgba(0,0,0,0.4)',
+        '--bg-card-solid': '#3e2a1e',
+        '--text-primary': '#f4d1ad',
+        '--text-secondary': '#c49a6c',
+        '--text-muted': '#8c6239',
+        '--accent': '#ffb050',
+        '--accent-rgb': '255,176,80',
+        '--accent-secondary': '#d97732',
+        '--accent-sec-rgb': '217,119,50',
+        '--cell-bg': 'rgba(0,0,0,0.2)',
+        '--cell-hover': 'rgba(255,176,80,0.15)',
+        '--border-glow': 'rgba(255,176,80,0.3)',
+        '--popup-bg': 'rgba(44,30,22,0.96)',
+        '--overlay': 'rgba(0,0,0,0.8)',
+    },
+    spaceTheme: {
+        '--bg-primary': '#050b14',
+        '--bg-secondary': '#0a192f',
+        '--bg-card': 'rgba(100,255,218,0.05)',
+        '--bg-card-solid': '#112240',
+        '--text-primary': '#ccd6f6',
+        '--text-secondary': '#8892b0',
+        '--text-muted': '#495670',
+        '--accent': '#64ffda',
+        '--accent-rgb': '100,255,218',
+        '--accent-secondary': '#0a192f',
+        '--accent-sec-rgb': '10,25,47',
+        '--cell-bg': 'rgba(100,255,218,0.03)',
+        '--cell-hover': 'rgba(100,255,218,0.1)',
+        '--border-glow': 'rgba(100,255,218,0.25)',
+        '--popup-bg': 'rgba(10,25,47,0.95)',
+        '--overlay': 'rgba(2,12,27,0.85)',
+    }
 };
 
 export function applyTheme(themeName) {
@@ -402,40 +438,15 @@ export function updateScoreDisplay(playerScore, aiScore) {
 }
 
 /**
- * Update level / stats display.
+ * Update rank / ELO display.
  */
-export function updateStatsDisplay(level, drawStreak, playerWins) {
-    const levelNames = ['', 'EASY', 'MEDIUM', 'HARD', 'CHAMPION'];
-    const ld = document.getElementById('levelDisplay');
-    const cd = document.getElementById('consecutiveDraws');
+export function updateStatsDisplay(rank, rating, playerWins) {
+    const rd = document.getElementById('rankDisplay');
+    const ed = document.getElementById('eloDisplay');
     const pw = document.getElementById('playerWinsDisplay');
-    if (ld) ld.textContent = `Level: ${levelNames[level] || 'CHAMPION'}`;
-    if (cd) cd.textContent = drawStreak;
+    if (rd) rd.textContent = `🏆 ${rank || 'Intermediate'}`;
+    if (ed) ed.textContent = rating || 1000;
     if (pw) pw.textContent = playerWins ?? 0;
-}
-
-/**
- * Update ELO Rating UI badge with animation.
- */
-export function updateEloDisplay(rating, rank, delta) {
-    const badge = document.getElementById('eloBadge');
-    const ratingDisplay = document.getElementById('ratingDisplay');
-    const rankDisplay = document.getElementById('rankDisplay');
-    const deltaDisplay = document.getElementById('ratingDelta');
-
-    if (ratingDisplay) ratingDisplay.textContent = Math.floor(rating);
-    if (rankDisplay) rankDisplay.textContent = rank;
-
-    if (delta !== 0 && deltaDisplay) {
-        deltaDisplay.textContent = delta > 0 ? `+${delta}` : delta;
-        deltaDisplay.className = `rating-delta ${delta > 0 ? 'positive' : 'negative'}`;
-        deltaDisplay.classList.add('show-delta');
-
-        // Remove animation class after sequence playing
-        setTimeout(() => {
-            deltaDisplay.classList.remove('show-delta');
-        }, 2000);
-    }
 }
 
 /**
@@ -535,50 +546,26 @@ export function renderStatsPanel(stats) {
 }
 
 /**
- * Render the Match History sidebar list
+ * Render the Match History sidebar list.
+ * @param {Array} matches array of match objects
  */
-export function renderHistoryList(replays, onReplayClick) {
+export function renderMatchHistory(matches) {
     const list = document.getElementById('historyList');
     if (!list) return;
 
-    if (!replays || replays.length === 0) {
+    if (!matches || matches.length === 0) {
         list.innerHTML = '<p class="history-empty">No games played yet.</p>';
         return;
     }
 
-    list.innerHTML = '';
-    replays.forEach((replay) => {
-        const item = document.createElement('div');
-        item.className = 'history-item';
-        item.style.display = 'flex';
-        item.style.justifyContent = 'space-between';
-        item.style.alignItems = 'center';
-        item.style.padding = '10px';
-        item.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-
-        const info = document.createElement('div');
-        info.className = 'history-info';
-
-        let difficultyStr = replay.difficulty ? ` (${replay.difficulty})` : '';
-        info.innerHTML = `
-            <strong style="color: var(--text-primary); text-transform: uppercase; font-size: 0.9rem;">${replay.mode === 'pvai' ? 'vs AI' : replay.mode}${difficultyStr}</strong>
-            <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 4px;">${replay.date} - ${replay.outcome}</span>
-            <span style="font-size: 0.85rem; color: var(--text-muted); display: block;">${replay.moves.length} moves</span>
-        `;
-
-        const btn = document.createElement('button');
-        btn.className = 'btn btn-secondary';
-        btn.style.padding = '4px 12px';
-        btn.style.fontSize = '0.85rem';
-        btn.textContent = 'Replay';
-        btn.onclick = () => {
-            const sidebar = document.getElementById('historySidebar');
-            if (sidebar) sidebar.classList.remove('open');
-            onReplayClick(replay);
-        };
-
-        item.appendChild(info);
-        item.appendChild(btn);
-        list.appendChild(item);
-    });
+    list.innerHTML = matches.map(m => `
+        <div class="history-item ${m.outcome}">
+            <div class="hi-info">
+                <strong>${m.outcome.toUpperCase()}</strong>
+                <span>vs ${m.aiPersonality} AI</span>
+                <span class="hi-date">${m.date}</span>
+            </div>
+            <button class="btn btn-sm" onclick="window.startReplay(${m.id})">▶ Replay</button>
+        </div>
+    `).join('');
 }

@@ -34,16 +34,12 @@ export function getEasyMove(board) {
     return empty[Math.floor(Math.random() * empty.length)];
 }
 
-/* ────────────────────────── Medium ────────────────────────── */
+/* ────────────────────────── Aggressive ────────────────────────── */
 
 /**
- * Try to win → block player → take center → random.
- * @param {string[]} board
- * @param {string} aiMark   - 'O'
- * @param {string} playerMark - 'X'
- * @returns {number}
+ * Aggressive: Strictly looks for an immediate winning move, otherwise random.
  */
-export function getMediumMove(board, aiMark = 'O', playerMark = 'X') {
+export function getAggressiveMove(board, aiMark = 'O') {
     const empty = getEmptyCells(board);
 
     // 1. Can AI win in one move?
@@ -53,21 +49,26 @@ export function getMediumMove(board, aiMark = 'O', playerMark = 'X') {
         if (checkWinner(b, aiMark)) return idx;
     }
 
-    // 2. Must block player from winning?
+    // 2. Random remaining
+    return empty[Math.floor(Math.random() * empty.length)];
+}
+
+/* ────────────────────────── Defensive ────────────────────────── */
+
+/**
+ * Defensive: Strictly looks for blocking a player win, otherwise random.
+ */
+export function getDefensiveMove(board, aiMark = 'O', playerMark = 'X') {
+    const empty = getEmptyCells(board);
+
+    // 1. Must block player from winning?
     for (const idx of empty) {
         const b = cloneBoard(board);
         b[idx] = playerMark;
         if (checkWinner(b, playerMark)) return idx;
     }
 
-    // 3. Take center if available
-    if (board[4] === '') return 4;
-
-    // 4. Take a corner
-    const corners = [0, 2, 6, 8].filter(i => board[i] === '');
-    if (corners.length) return corners[Math.floor(Math.random() * corners.length)];
-
-    // 5. Random remaining
+    // 2. Random remaining
     return empty[Math.floor(Math.random() * empty.length)];
 }
 
@@ -153,135 +154,18 @@ function minimax(board, depth, isMaximizing, alpha, beta, aiMark, playerMark) {
 /* ────────────────────────── Dispatcher ────────────────────────── */
 
 /**
- * Get the AI's move based on the current difficulty setting.
+ * Get the AI's move based on the current AI personality.
  * @param {string[]} board
- * @param {'easy'|'medium'|'hard'} difficulty
+ * @param {'random'|'defensive'|'aggressive'|'perfect'} aiPersonality
  * @param {string} aiMark
  * @param {string} playerMark
  * @returns {number}
  */
-export function getAIMove(board, difficulty, aiMark = 'O', playerMark = 'X', personality = 'perfect') {
-    // If difficulty is easy, we just do random regardless of personality
-    if (difficulty === 'easy' || personality === 'random') {
-        return getEasyMove(board);
+export function getAIMove(board, aiPersonality, aiMark = 'O', playerMark = 'X') {
+    switch (aiPersonality) {
+        case 'perfect': return getHardMove(board, aiMark, playerMark);
+        case 'aggressive': return getAggressiveMove(board, aiMark);
+        case 'defensive': return getDefensiveMove(board, aiMark, playerMark);
+        case 'random': default: return getEasyMove(board);
     }
-
-    // For medium/hard, we blend difficulty with personality
-    if (personality === 'aggressive') {
-        return getAggressiveMove(board, aiMark, playerMark, difficulty === 'hard');
-    }
-    if (personality === 'defensive') {
-        return getDefensiveMove(board, aiMark, playerMark, difficulty === 'hard');
-    }
-
-    // Default 'perfect' (or unhandled)
-    if (difficulty === 'medium') {
-        return getMediumMove(board, aiMark, playerMark);
-    }
-    return getHardMove(board, aiMark, playerMark);
-}
-
-/* ────────────────────────── Personalities ────────────────────────── */
-
-/**
- * Aggressive AI: Heavily prioritizes finding its own winning moves.
- * If hard is true, uses depth-limited search looking for forced wins.
- * If false, just looks 1 step ahead for wins, then random.
- */
-function getAggressiveMove(board, aiMark, playerMark, isHard) {
-    // 1. Can I win immediately?
-    const winMove = findWinningMove(board, aiMark);
-    if (winMove !== -1) return winMove;
-
-    if (isHard) {
-        // Evaluate all empty cells by how many winning lines they create
-        const empty = getEmptyCells(board);
-        let bestScore = -Infinity;
-        let bestMoves = [];
-
-        for (const idx of empty) {
-            let score = 0;
-            const b = cloneBoard(board);
-            b[idx] = aiMark;
-
-            // Does this create multiple win threats (fork)?
-            let threats = 0;
-            const remEmpty = getEmptyCells(b);
-            for (const nxt of remEmpty) {
-                const b2 = cloneBoard(b);
-                b2[nxt] = aiMark;
-                if (checkWinner(b2, aiMark)) threats++;
-            }
-            score += (threats * 10);
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestMoves = [idx];
-            } else if (score === bestScore) {
-                bestMoves.push(idx);
-            }
-        }
-
-        if (bestMoves.length > 0 && bestScore > 0) {
-            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
-        }
-    }
-
-    // Fallback: take center, then random empty
-    if (board[4] === '') return 4;
-    return getEasyMove(board);
-}
-
-/**
- * Defensive AI: Heavily prioritizes blocking the player over its own win.
- */
-function getDefensiveMove(board, aiMark, playerMark, isHard) {
-    // 1. Must block immediate player win
-    const blockMove = findWinningMove(board, playerMark);
-    if (blockMove !== -1) return blockMove;
-
-    if (isHard) {
-        // Prevent player forks
-        const empty = getEmptyCells(board);
-        let maxThreatRemoved = -1;
-        let bestMoves = [];
-
-        for (const idx of empty) {
-            // Count player threats BEFORE we move here
-            let initialThreats = 0;
-            const emptyBefore = getEmptyCells(board);
-            for (const nxt of emptyBefore) {
-                if (nxt === idx) continue;
-                const tb = cloneBoard(board);
-                tb[nxt] = playerMark;
-                if (checkWinner(tb, playerMark)) initialThreats++;
-            }
-
-            // Count player threats AFTER we move here
-            let threatsAfter = 0;
-            const b = cloneBoard(board);
-            b[idx] = aiMark;
-            const emptyAfter = getEmptyCells(b);
-            for (const nxt of emptyAfter) {
-                const tb = cloneBoard(b);
-                tb[nxt] = playerMark;
-                if (checkWinner(tb, playerMark)) threatsAfter++;
-            }
-
-            const threatReduction = initialThreats - threatsAfter;
-            if (threatReduction > maxThreatRemoved) {
-                maxThreatRemoved = threatReduction;
-                bestMoves = [idx];
-            } else if (threatReduction === maxThreatRemoved) {
-                bestMoves.push(idx);
-            }
-        }
-
-        if (bestMoves.length > 0 && maxThreatRemoved > 0) {
-            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
-        }
-    }
-
-    // Fallback: Block corners if player has center, etc (just use medium fallback)
-    return getMediumMove(board, aiMark, playerMark);
 }
