@@ -54,6 +54,11 @@ function setupConnection(connection) {
                 onMoveCallback(-1); // -1 = restart signal
             }
         }
+        if (data.type === 'leave') {
+            // Signal game.js that the opponent left the room
+            emitStatus('disconnected', 'Opponent left the room.');
+            if (onDisconnectCallback) onDisconnectCallback(true);
+        }
     });
 
     conn.on('close', () => {
@@ -179,6 +184,15 @@ export function sendRestart() {
 }
 
 /**
+ * Send a leave signal to the remote player.
+ */
+export function sendLeave() {
+    if (conn && conn.open) {
+        conn.send({ type: 'leave' });
+    }
+}
+
+/**
  * Set the callback for when a remote move is received.
  * @param {function(number)} cb — called with cell index, or -1 for restart
  */
@@ -225,8 +239,12 @@ export function isConnected() {
 
 /**
  * Disconnect and clean up.
+ * @param {boolean} notifyRemote — Whether to message the remote peer before closing
  */
-export function disconnect() {
+export function disconnect(notifyRemote = false) {
+    if (notifyRemote && conn && conn.open) {
+        conn.send({ type: 'leave' });
+    }
     if (conn) {
         conn.close();
         conn = null;
@@ -239,3 +257,13 @@ export function disconnect() {
     roomCode = '';
     emitStatus('disconnected', 'Disconnected from room.');
 }
+
+// Ensure peer connection closes gracefully on refresh/close
+window.addEventListener('beforeunload', () => {
+    if (peer && !peer.destroyed) {
+        if (conn && conn.open) {
+            conn.send({ type: 'leave' });
+        }
+        peer.destroy();
+    }
+});

@@ -21,6 +21,7 @@
     rel="stylesheet">
 
   <link rel="stylesheet" href="./styles/style.css">
+  <link rel="stylesheet" href="./styles/room.css">
 
   <!-- PeerJS for WebRTC multiplayer -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -56,6 +57,8 @@
       <button class="ctrl-btn" id="undoBtn" aria-label="Undo last move">↩ Undo</button>
       <button class="ctrl-btn" id="restart" aria-label="Restart current round">🔄 Restart</button>
       <button class="ctrl-btn" id="quit" aria-label="Reset all scores and restart">⏹ Quit</button>
+      <button class="ctrl-btn" id="leaveRoomBtn" aria-label="Leave multiplayer room" style="display: none;">🚪 Leave
+        Room</button>
       <button class="ctrl-btn" id="soundToggle" aria-label="Toggle sound effects">🔊 Sound</button>
       <button class="ctrl-btn" id="statsToggle" aria-label="Toggle statistics panel">📊 Stats</button>
     </nav>
@@ -81,6 +84,13 @@
       <div class="stat-item" id="timer">⏱ 0s</div>
       <div class="stat-item">Draws: <span class="value" id="totalDraws">0</span></div>
       <div class="stat-item">Streak: <span class="value" id="consecutiveDraws">0</span></div>
+    </div>
+
+    <!-- ═══════════ ROOM INFO BAR ═══════════ -->
+    <div class="room-info-bar" id="roomInfoBar" aria-label="Room details" style="display: none;">
+      <div class="stat-item">Code: <span class="value" id="roomCodeDisplay">—</span></div>
+      <div class="stat-item">Players: <span class="value" id="roomPlayersCount">1 / 2</span></div>
+      <div class="stat-item status-text" id="roomConnectionStatus">Waiting for opponent...</div>
     </div>
 
     <!-- ═══════════ TURN INDICATOR ═══════════ -->

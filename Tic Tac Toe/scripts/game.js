@@ -16,14 +16,14 @@ import {
     renderMark, highlightWinningCells, setTurnIndicator,
     updateScoreDisplay, updateStatsDisplay,
     showPopup, hidePopup, hideAllPopups,
-    setTimerDisplay, updateModeLabel,
+    setTimerDisplay, updateModeLabel, updateRoomInfoBar,
     toggleSound, setSoundEnabled,
     renderStatsPanel,
 } from './ui.js';
 import {
-    createRoom, joinRoom, sendMove, sendRestart,
+    createRoom, joinRoom, sendMove, sendRestart, sendLeave,
     onRemoteMove, onStatus, onDisconnect,
-    getIsHost, disconnect, isConnected,
+    getIsHost, getRoomCode, disconnect, isConnected,
 } from './multiplayer.js';
 import { trackEvent } from './analytics.js';
 
@@ -408,22 +408,39 @@ function setGameMode(mode) {
     const diffSel = document.getElementById('difficulty');
     const undoBtn = document.getElementById('undoBtn');
     const statsBar = document.querySelector('.stats-bar');
+    const roomInfoBar = document.getElementById('roomInfoBar');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+    const restartBtn = document.getElementById('restart');
+    const quitBtn = document.getElementById('quit');
 
     if (mode === 'pvai') {
         if (diffSel) diffSel.style.display = '';
         if (undoBtn) undoBtn.style.display = '';
         if (statsBar) statsBar.style.display = '';
+        if (roomInfoBar) roomInfoBar.style.display = 'none';
+        if (leaveRoomBtn) leaveRoomBtn.style.display = 'none';
+        if (restartBtn) restartBtn.style.display = '';
+        if (quitBtn) quitBtn.style.display = '';
         updateModeLabel('pvai');
     } else if (mode === 'pvp') {
         if (diffSel) diffSel.style.display = 'none';
         if (undoBtn) undoBtn.style.display = '';
         if (statsBar) statsBar.style.display = 'none';
+        if (roomInfoBar) roomInfoBar.style.display = 'none';
+        if (leaveRoomBtn) leaveRoomBtn.style.display = 'none';
+        if (restartBtn) restartBtn.style.display = '';
+        if (quitBtn) quitBtn.style.display = '';
         updateModeLabel('pvp');
     } else if (mode === 'online') {
         if (diffSel) diffSel.style.display = 'none';
         if (undoBtn) undoBtn.style.display = 'none';
         if (statsBar) statsBar.style.display = 'none';
+        if (roomInfoBar) roomInfoBar.style.display = 'flex';
+        if (leaveRoomBtn) leaveRoomBtn.style.display = '';
+        if (restartBtn) restartBtn.style.display = 'none';
+        if (quitBtn) quitBtn.style.display = 'none';
         updateModeLabel('online');
+        updateRoomInfoBar('—', 1, 'Lobby');
         showPopup('lobbyPopup');
         return;
     }
@@ -446,6 +463,11 @@ function setupMultiplayer() {
             else if (status === 'waiting' || status === 'connecting') dotEl.classList.add('yellow');
             else dotEl.classList.add('red');
         }
+
+        // Update Room Info Bar
+        const pCount = status === 'connected' ? 2 : 1;
+        updateRoomInfoBar(getRoomCode(), pCount, message);
+
         if (status === 'connected') {
             setTimeout(() => {
                 hidePopup('lobbyPopup');
@@ -465,12 +487,15 @@ function setupMultiplayer() {
         makeMove(index, remoteMark);
     });
 
-    onDisconnect(() => {
+    onDisconnect((intentionalLeave) => {
         if (getState().gameMode === 'online') {
             setState({ gameStatus: 'idle' });
             timer.stop();
+
+            updateRoomInfoBar(getRoomCode(), 1, intentionalLeave ? 'Opponent left' : 'Disconnected');
+
             const titleEl = document.getElementById('pvpWinTitle');
-            if (titleEl) titleEl.textContent = '🔌 Opponent Disconnected';
+            if (titleEl) titleEl.textContent = intentionalLeave ? '🚪 Opponent Left The Room' : '🔌 Opponent Disconnected';
             showPopup('pvpWinPopup');
         }
     });
@@ -628,10 +653,21 @@ function init() {
         startNewRound();
     });
     document.getElementById('quit')?.addEventListener('click', () => {
-        if (getState().gameMode === 'online') disconnect();
+        if (getState().gameMode === 'online') disconnect(true); // notifyRemote
         setGameMode('pvai');
         restartGame();
     });
+
+    // Custom Leave Room Behavior
+    document.getElementById('leaveRoomBtn')?.addEventListener('click', () => {
+        if (getState().gameMode === 'online') {
+            disconnect(true); // send leave signal
+            setGameMode('pvai'); // reset to menu state essentially
+            showPopup('lobbyPopup'); // Immediately pop the lobby back open
+            setGameMode('online'); // Trigger the UI cleanups for online mode
+        }
+    });
+
     document.getElementById('undoBtn')?.addEventListener('click', undoLastMove);
     document.getElementById('soundToggle')?.addEventListener('click', () => {
         const enabled = toggleSound();

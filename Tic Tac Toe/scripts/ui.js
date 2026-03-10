@@ -422,8 +422,6 @@ export function hideAllPopups() {
 }
 
 
-
-
 /**
  * Set the timer display.
  */
@@ -441,6 +439,30 @@ export function updateModeLabel(mode) {
         if (mode === 'online') label.textContent = 'Opponent';
         else if (mode === 'pvp') label.textContent = 'Player 2';
         else label.textContent = 'AI';
+    }
+}
+
+/**
+ * Update the room info bar (only visible in online mode).
+ * @param {string} code
+ * @param {number} playerCount
+ * @param {string} status
+ */
+export function updateRoomInfoBar(code, playerCount, status) {
+    const codeEl = document.getElementById('roomCodeDisplay');
+    const countEl = document.getElementById('roomPlayersCount');
+    const statusEl = document.getElementById('roomConnectionStatus');
+
+    if (codeEl) codeEl.textContent = code || '—';
+    if (countEl) countEl.textContent = `${playerCount} / 2`;
+
+    if (statusEl) {
+        statusEl.textContent = status || 'Waiting...';
+        if (status?.toLowerCase().includes('connected')) {
+            statusEl.classList.add('connected');
+        } else {
+            statusEl.classList.remove('connected');
+        }
     }
 }
 
