@@ -21,9 +21,9 @@ const initialState = {
 
     // Progression
     level: 1,
+    playerWins: 0,
     hardWins: 0,
-    totalDraws: 0,
-    consecutiveDraws: 0,
+    drawStreak: 0,
     difficulty: 'easy',
     manualDifficulty: false,
 
@@ -126,8 +126,8 @@ export function resetAllScores() {
         playerScore: 0,
         aiScore: 0,
         level: 1,
+        playerWins: 0,
         hardWins: 0,
-        totalDraws: 0,
-        consecutiveDraws: 0,
+        drawStreak: 0,
     });
 }

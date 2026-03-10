@@ -335,9 +335,24 @@ export function renderMark(cellEl, mark) {
     cellEl.appendChild(span);
     cellEl.setAttribute('aria-label', `Cell ${cellEl.dataset.index}: ${mark}`);
 
+    // 3D flip animation
+    cellEl.classList.add('cell-flip');
+    setTimeout(() => cellEl.classList.remove('cell-flip'), 450);
+
     // Trigger reflow then animate
     void span.offsetWidth;
     span.classList.add('appear');
+}
+
+/**
+ * Shake the board (used on AI win / loss).
+ */
+export function shakeBoard() {
+    const board = document.getElementById('board');
+    if (board) {
+        board.classList.add('board-shake');
+        setTimeout(() => board.classList.remove('board-shake'), 600);
+    }
 }
 
 /**
@@ -389,14 +404,14 @@ export function updateScoreDisplay(playerScore, aiScore) {
 /**
  * Update level / stats display.
  */
-export function updateStatsDisplay(level, totalDraws, consecutiveDraws) {
-    const levelNames = ['', 'EASY', 'MEDIUM', 'HARD', 'HARD+', 'EXPERT', 'CHAMPION'];
+export function updateStatsDisplay(level, drawStreak, playerWins) {
+    const levelNames = ['', 'EASY', 'MEDIUM', 'HARD', 'CHAMPION'];
     const ld = document.getElementById('levelDisplay');
-    const td = document.getElementById('totalDraws');
     const cd = document.getElementById('consecutiveDraws');
-    if (ld) ld.textContent = `Level: ${levelNames[level] || level}`;
-    if (td) td.textContent = totalDraws;
-    if (cd) cd.textContent = consecutiveDraws;
+    const pw = document.getElementById('playerWinsDisplay');
+    if (ld) ld.textContent = `Level: ${levelNames[level] || 'CHAMPION'}`;
+    if (cd) cd.textContent = drawStreak;
+    if (pw) pw.textContent = playerWins ?? 0;
 }
 
 /**

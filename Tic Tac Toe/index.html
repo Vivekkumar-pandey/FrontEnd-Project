@@ -55,12 +55,14 @@
         <option value="online">🌐 Online PvP</option>
       </select>
       <button class="ctrl-btn" id="undoBtn" aria-label="Undo last move">↩ Undo</button>
+      <button class="ctrl-btn" id="hintBtn" aria-label="Show best move hint">💡 Hint</button>
       <button class="ctrl-btn" id="restart" aria-label="Restart current round">🔄 Restart</button>
       <button class="ctrl-btn" id="quit" aria-label="Reset all scores and restart">⏹ Quit</button>
       <button class="ctrl-btn" id="leaveRoomBtn" aria-label="Leave multiplayer room" style="display: none;">🚪 Leave
         Room</button>
       <button class="ctrl-btn" id="soundToggle" aria-label="Toggle sound effects">🔊 Sound</button>
       <button class="ctrl-btn" id="statsToggle" aria-label="Toggle statistics panel">📊 Stats</button>
+      <button class="ctrl-btn" id="historyToggle" aria-label="Toggle match history">📜 History</button>
     </nav>
 
     <!-- ═══════════ SCOREBOARD ═══════════ -->
@@ -82,8 +84,8 @@
     <div class="stats-bar" aria-label="Game statistics">
       <div class="stat-item" id="levelDisplay">Level: EASY</div>
       <div class="stat-item" id="timer">⏱ 0s</div>
-      <div class="stat-item">Draws: <span class="value" id="totalDraws">0</span></div>
-      <div class="stat-item">Streak: <span class="value" id="consecutiveDraws">0</span></div>
+      <div class="stat-item">Wins: <span class="value" id="playerWinsDisplay">0</span></div>
+      <div class="stat-item">Draw⚡: <span class="value" id="consecutiveDraws">0</span></div>
     </div>
 
     <!-- ═══════════ ROOM INFO BAR ═══════════ -->
@@ -180,11 +182,14 @@
       <ul class="rules-list">
         <li>Start at <strong>Easy</strong> level. Win <strong>5 games</strong> to advance to <strong>Medium</strong>.
         </li>
-        <li>At <strong>Medium</strong>, win <strong>10 games</strong> to reach <strong>Hard</strong>.</li>
-        <li>At any level, draw <strong>5 times in a row</strong> to level up.</li>
-        <li>At <strong>Hard</strong>, draw <strong>7 times in a row</strong> to become <strong>Champion</strong>!</li>
-        <li>Select <strong>Online PvP</strong> to create or join a room and play with friends on any device.</li>
-        <li>Choose a <strong>theme</strong> and toggle <strong>sound</strong> to customize your experience.</li>
+        <li>At <strong>Medium</strong>, win <strong>7 games</strong> or build a <strong>5-game draw streak</strong> to
+          reach <strong>Hard</strong>.</li>
+        <li>At <strong>Hard</strong>, win <strong>10 games</strong> or <strong>draw 7 in a row</strong> to become
+          <strong>Champion</strong>!</li>
+        <li>Draw streak <strong>persists through wins</strong> but <strong>resets if AI wins</strong>.</li>
+        <li>Use <strong>💡 Hint</strong> for the optimal move (3 per game).</li>
+        <li>Press <strong>numpad keys 1-9</strong> to place marks via keyboard.</li>
+        <li>Select <strong>Online PvP</strong> to play with friends on any device.</li>
       </ul>
       <button class="btn" id="startGameBtn" autofocus>START GAME</button>
     </div>
@@ -275,12 +280,35 @@
 
   <!-- Champion -->
   <div id="championPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="championTitle">
-    <div class="popup-card">
-      <h2 id="championTitle">🏆 CHAMPION!</h2>
-      <p>Congratulations — you mastered the Neon Arena!</p>
-      <button class="btn" id="championPopupOk">Play Again</button>
+    <div class="popup-card champion-card">
+      <div class="champion-trophy">🏆</div>
+      <h2 id="championTitle" class="champion-title">CHAMPION!</h2>
+      <p class="champion-subtitle">You mastered the Neon Arena!</p>
+      <div class="champion-stats">
+        <div class="champ-stat"><span class="champ-stat-value" id="champWins">0</span><span
+            class="champ-stat-label">Wins</span></div>
+        <div class="champ-stat"><span class="champ-stat-value" id="champStreak">0</span><span
+            class="champ-stat-label">Best Streak</span></div>
+        <div class="champ-stat"><span class="champ-stat-value" id="champFastest">--</span><span
+            class="champ-stat-label">Fastest Win</span></div>
+      </div>
+      <div class="champion-actions">
+        <button class="btn" id="championPopupOk">Keep Playing</button>
+        <button class="btn btn-secondary" id="championResetBtn">Reset Progress</button>
+      </div>
     </div>
   </div>
+
+  <!-- Match History Sidebar -->
+  <aside id="historySidebar" class="stats-sidebar" aria-label="Match history panel">
+    <div class="stats-sidebar-header">
+      <h2>📜 Match History</h2>
+      <button class="stats-close" id="historyClose" aria-label="Close history panel">&times;</button>
+    </div>
+    <div id="historyList" class="history-list">
+      <p class="history-empty">No games played yet.</p>
+    </div>
+  </aside>
 
   <!-- ═══════════ ES6 Module Entry ═══════════ -->
   <script type="module" src="./scripts/game.js"></script>

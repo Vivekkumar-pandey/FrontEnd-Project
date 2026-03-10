@@ -19,6 +19,7 @@ import {
     setTimerDisplay, updateModeLabel, updateRoomInfoBar,
     toggleSound, setSoundEnabled,
     renderStatsPanel,
+    shakeBoard,
 } from './ui.js';
 import {
     createRoom, joinRoom, sendMove, sendRestart, sendLeave,
@@ -60,9 +61,9 @@ function persistState() {
         playerScore: s.playerScore,
         aiScore: s.aiScore,
         level: s.level,
+        playerWins: s.playerWins,
         hardWins: s.hardWins,
-        totalDraws: s.totalDraws,
-        consecutiveDraws: s.consecutiveDraws,
+        drawStreak: s.drawStreak,
         difficulty: s.difficulty,
         manualDifficulty: s.manualDifficulty,
         theme: s.theme,
@@ -225,9 +226,10 @@ function handleWin(mark) {
             setState({
                 gameStatus: 'won',
                 playerScore: s.playerScore + 1,
-                consecutiveDraws: 0,
+                playerWins: s.playerWins + 1,
                 stats: newStats,
             });
+            // drawStreak is NOT reset on player win — only on AI win
             updateLevel('win');
             playWinSound();
             launchConfetti(3500);
@@ -242,10 +244,11 @@ function handleWin(mark) {
             setState({
                 gameStatus: 'lost',
                 aiScore: s.aiScore + 1,
-                consecutiveDraws: 0,
+                drawStreak: 0, // AI win resets draw streak
                 stats: newStats,
             });
             playLoseSound();
+            shakeBoard(); // Visual feedback on loss
             updateLevel('loss');
             trackEvent('game_loss', { difficulty: resolveDifficulty(), duration });
             setTimeout(() => showPopup('aiWinPopup'), 500);
@@ -280,7 +283,7 @@ function handleWin(mark) {
 
     const cur = getState();
     updateScoreDisplay(cur.playerScore, cur.aiScore);
-    updateStatsDisplay(cur.level, cur.totalDraws, cur.consecutiveDraws);
+    updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
     renderStatsPanel(cur.stats);
     persistState();
 }
@@ -297,8 +300,7 @@ function handleDraw() {
 
     setState({
         gameStatus: 'draw',
-        totalDraws: s.totalDraws + 1,
-        consecutiveDraws: s.consecutiveDraws + 1,
+        drawStreak: s.drawStreak + 1,
         stats: newStats,
     });
 
@@ -310,7 +312,7 @@ function handleDraw() {
     }
 
     const cur = getState();
-    updateStatsDisplay(cur.level, cur.totalDraws, cur.consecutiveDraws);
+    updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
     renderStatsPanel(cur.stats);
     setTimeout(() => showPopup('drawPopup'), 300);
     persistState();
@@ -327,30 +329,34 @@ function updateLevel(outcome) {
     // Track Hard-level wins
     if (outcome === 'win' && s.level === 3) hardWins++;
 
-    // Level 1 → 2: player must have 5-game win advantage
-    if (newLevel === 1 && (s.playerScore - s.aiScore) >= 5) {
+    // Level 1 → 2: player wins >= 5
+    if (newLevel === 1 && s.playerWins >= 5) {
         newLevel = 2;
     }
-    // Level 2 → 3: player must have 7-game win advantage
-    if (newLevel === 2 && (s.playerScore - s.aiScore) >= 7) {
+    // Level 2 → 3: player wins >= 7 OR drawStreak >= 5
+    if (newLevel === 2 && (s.playerWins >= 7 || s.drawStreak >= 5)) {
         newLevel = 3;
     }
-    // Level 3 → 4 (Champion): 10 hard wins OR 7 consecutive draws
-    if (newLevel === 3 && (hardWins >= 10 || s.consecutiveDraws >= 7)) {
+    // Level 3 → 4 (Champion): hardWins >= 10 OR drawStreak >= 7
+    if (newLevel === 3 && (hardWins >= 10 || s.drawStreak >= 7)) {
         newLevel = 4;
     }
+
+    // Reset draw streak on level-up to keep things clean
+    const newDrawStreak = (newLevel !== prevLevel) ? 0 : s.drawStreak;
 
     setState({
         level: newLevel,
         hardWins,
-        manualDifficulty: false // Revert control back to level progression on advancing
+        drawStreak: newDrawStreak,
+        manualDifficulty: false
     });
 
     if (newLevel !== prevLevel && newLevel < 4) {
         playLevelUpSound();
         trackEvent('level_up', { level: newLevel });
         showLevelUpPopup(newLevel);
-    } else if (newLevel === 4) {
+    } else if (newLevel === 4 && prevLevel !== 4) {
         playLevelUpSound();
         launchConfetti(5000);
         trackEvent('champion');
@@ -363,9 +369,9 @@ function updateLevel(outcome) {
     }
 
     const cur = getState();
-    updateStatsDisplay(cur.level, cur.totalDraws, cur.consecutiveDraws);
+    updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
 
-    console.log(`[Progression] Level: ${cur.level}, Advantage: ${cur.playerScore - cur.aiScore}, HardWins: ${cur.hardWins}, ConsecDraws: ${cur.consecutiveDraws}`);
+    console.log(`[Progression] Level: ${cur.level}, PlayerWins: ${cur.playerWins}, HardWins: ${cur.hardWins}, DrawStreak: ${cur.drawStreak}`);
 }
 
 function showLevelUpPopup(level) {
@@ -631,7 +637,7 @@ function init() {
     if (s.soundEnabled !== undefined) setSoundEnabled(s.soundEnabled);
 
     updateScoreDisplay(s.playerScore, s.aiScore);
-    updateStatsDisplay(s.level, s.totalDraws, s.consecutiveDraws);
+    updateStatsDisplay(s.level, s.drawStreak, s.playerWins);
     updateModeLabel(s.gameMode);
     renderStatsPanel(s.stats);
 
@@ -694,6 +700,50 @@ function init() {
     });
 
     document.getElementById('undoBtn')?.addEventListener('click', undoLastMove);
+
+    // Hint system — show the best move
+    let hintsUsed = 0;
+    document.getElementById('hintBtn')?.addEventListener('click', () => {
+        const s = getState();
+        if (s.gameStatus !== 'playing' || s.isAIThinking || s.gameMode !== 'pvai') return;
+        if (hintsUsed >= 3) {
+            document.getElementById('hintBtn').textContent = '💡 No hints left';
+            return;
+        }
+        const bestIdx = getAIMove(s.board, 'hard', 'X', 'O');
+        if (bestIdx < 0) return;
+        const cell = document.querySelector(`.cell[data-index="${bestIdx}"]`);
+        if (cell) {
+            cell.classList.add('hint-glow');
+            setTimeout(() => cell.classList.remove('hint-glow'), 2000);
+        }
+        hintsUsed++;
+        document.getElementById('hintBtn').textContent = `💡 Hint (${3 - hintsUsed})`;
+    });
+
+    // Reset hints on new round
+    subscribe((state, prev) => {
+        if (state.gameStatus === 'playing' && prev.gameStatus !== 'playing') {
+            hintsUsed = 0;
+            const hintBtn = document.getElementById('hintBtn');
+            if (hintBtn) hintBtn.textContent = '💡 Hint';
+        }
+    });
+
+    // Keyboard controls — numpad 1-9 maps to cells
+    document.addEventListener('keydown', (e) => {
+        const s = getState();
+        if (s.gameStatus !== 'playing' || s.isAIThinking) return;
+        if (s.gameMode !== 'pvai' && s.gameMode !== 'pvp') return;
+        // Numpad layout: 7=top-left, 8=top-mid ... 1=bottom-left
+        const keyMap = { '7': 0, '8': 1, '9': 2, '4': 3, '5': 4, '6': 5, '1': 6, '2': 7, '3': 8 };
+        const idx = keyMap[e.key];
+        if (idx !== undefined && s.board[idx] === '') {
+            if (s.gameMode === 'pvai') makeMove(idx, 'X');
+            else makeMove(idx, s.currentPlayer);
+        }
+    });
+
     document.getElementById('soundToggle')?.addEventListener('click', () => {
         const enabled = toggleSound();
         setState({ soundEnabled: enabled });
