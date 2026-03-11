@@ -45,15 +45,6 @@
 
     <!-- ═══════════ CONTROLS ═══════════ -->
     <nav class="controls" role="toolbar" aria-label="Game controls">
-      <select id="aiPersonality" aria-label="AI Personality">
-        <option value="random">🎲 Random AI</option>
-        <option value="defensive">🛡️ Defensive AI</option>
-        <option value="aggressive">⚔️ Aggressive AI</option>
-        <option value="perfect" selected>🧠 Perfect AI</option>
-      </select>
-      <label class="dda-toggle" aria-label="Adaptive Difficulty">
-        <input type="checkbox" id="ddaToggle" checked> Adaptive (DDA)
-      </label>
       <select id="modeSelect" aria-label="Game Mode">
         <option value="pvai">🤖 vs AI</option>
         <option value="pvp">👥 Local PvP</option>
@@ -89,6 +80,7 @@
     <div class="stats-bar" aria-label="Game statistics">
       <div class="stat-item" id="rankDisplay">🏆 Easy</div>
       <div class="stat-item">Progress: <span class="value" id="eloDisplay">0/5</span></div>
+      <div class="stat-item">Draws: <span class="value" id="drawStreakDisplay">0</span></div>
       <div class="stat-item" id="timer">⏱ 0s</div>
       <div class="stat-item">Wins: <span class="value" id="playerWinsDisplay">0</span></div>
     </div>

@@ -440,9 +440,10 @@ export function updateScoreDisplay(playerScore, aiScore) {
 /**
  * Update rank / ELO display.
  */
-export function updateStatsDisplay(rank, levelWins, playerWins) {
+export function updateStatsDisplay(rank, levelWins, playerWins, drawStreak) {
     const rd = document.getElementById('rankDisplay');
     const ed = document.getElementById('eloDisplay');
+    const dsd = document.getElementById('drawStreakDisplay');
     const pw = document.getElementById('playerWinsDisplay');
     if (rd) rd.textContent = `🏆 ${rank || 'Easy'}`;
 
@@ -451,6 +452,7 @@ export function updateStatsDisplay(rank, levelWins, playerWins) {
     const req = requirements[rank];
     if (ed) ed.textContent = req ? `${levelWins || 0}/${req}` : 'MAX';
 
+    if (dsd) dsd.textContent = drawStreak ?? 0;
     if (pw) pw.textContent = playerWins ?? 0;
 }
 

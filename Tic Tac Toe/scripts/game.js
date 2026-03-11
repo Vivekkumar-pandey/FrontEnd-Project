@@ -267,7 +267,7 @@ function handleWin(mark) {
 
     const cur = getState();
     updateScoreDisplay(cur.playerScore, cur.aiScore);
-    updateStatsDisplay(cur.rank, cur.levelWins, cur.playerWins);
+    updateStatsDisplay(cur.rank, cur.levelWins, cur.playerWins, cur.drawStreak);
     renderStatsPanel(cur.stats);
     persistState();
 }
@@ -298,7 +298,7 @@ function handleDraw() {
     }
 
     const cur = getState();
-    updateStatsDisplay(cur.rank, cur.levelWins, cur.playerWins);
+    updateStatsDisplay(cur.rank, cur.levelWins, cur.playerWins, cur.drawStreak);
     renderStatsPanel(cur.stats);
     if (!leveledUp) setTimeout(() => showPopup('drawPopup'), 300);
     persistState();
@@ -337,48 +337,27 @@ function updateProgression(outcome) {
         leveledUp = true;
     }
 
-    // 3. Dynamic Difficulty Adjustment (DDA)
-    let newWinStreak = outcome === 'win' ? s.winStreak + 1 : 0;
-    let newLossStreak = outcome === 'loss' ? s.lossStreak + 1 : 0;
-    let newPersonality = s.aiPersonality;
-
-    if (outcome === 'draw') {
-        newWinStreak = 0;
-        newLossStreak = 0;
-    }
-
-    if (s.adaptiveDifficulty) {
-        const curTierIdx = AI_TIERS.indexOf(s.aiPersonality);
-        if (newWinStreak >= 4 && curTierIdx < AI_TIERS.length - 1) {
-            newPersonality = AI_TIERS[curTierIdx + 1];
-            newWinStreak = 0;
-            trackEvent('dda_increase', { to: newPersonality });
-        } else if (newLossStreak >= 3 && curTierIdx > 0) {
-            newPersonality = AI_TIERS[curTierIdx - 1];
-            newLossStreak = 0;
-            trackEvent('dda_decrease', { to: newPersonality });
-        }
-    }
+    // 3. Bind AI Personality strictly to Level
+    let newPersonality = 'random'; // default Easy
+    if (newLevel === 'Medium') newPersonality = 'defensive';
+    else if (newLevel === 'Hard') newPersonality = 'aggressive';
+    else if (newLevel === 'Champion') newPersonality = 'perfect';
 
     // 4. Update State
     const stateUpdate = {
         rank: newLevel,
         levelWins: newLevelWins,
-        winStreak: newWinStreak,
-        lossStreak: newLossStreak,
         aiPersonality: newPersonality,
+        winStreak: outcome === 'win' ? s.winStreak + 1 : 0,
+        lossStreak: outcome === 'loss' ? s.lossStreak + 1 : 0,
     };
     if (leveledUp) stateUpdate.drawStreak = 0;
     setState(stateUpdate);
 
-    // 5. Update AI personality selector
-    const sel = document.getElementById('aiPersonality');
-    if (sel && s.adaptiveDifficulty) sel.value = newPersonality;
+    // 5. Update stats display
+    updateStatsDisplay(newLevel, newLevelWins, getState().playerWins, getState().drawStreak);
 
-    // 6. Update stats display
-    updateStatsDisplay(newLevel, newLevelWins, getState().playerWins);
-
-    // 7. Show level-up feedback
+    // 6. Show level-up feedback
     if (leveledUp) {
         if (newLevel === 'Champion') {
             playLevelUpSound();
@@ -557,9 +536,7 @@ function restartGame() {
     resetAllScores();
     updateScoreDisplay(0, 0);
     const s = getState();
-    updateStatsDisplay(s.rank, 0, 0);
-    const sel = document.getElementById('aiPersonality');
-    if (sel) sel.value = s.aiPersonality;
+    updateStatsDisplay(s.rank, 0, 0, 0);
     persistState();
     startNewRound();
 }
@@ -571,7 +548,6 @@ function setGameMode(mode) {
 
     setState({ gameMode: mode, myMark: 'X' });
 
-    const diffSel = document.getElementById('difficulty');
     const undoBtn = document.getElementById('undoBtn');
     const statsBar = document.querySelector('.stats-bar');
     const roomInfoBar = document.getElementById('roomInfoBar');
@@ -580,7 +556,6 @@ function setGameMode(mode) {
     const quitBtn = document.getElementById('quit');
 
     if (mode === 'pvai') {
-        if (diffSel) diffSel.style.display = '';
         if (undoBtn) undoBtn.style.display = '';
         if (statsBar) statsBar.style.display = '';
         if (roomInfoBar) roomInfoBar.style.display = 'none';
@@ -589,7 +564,6 @@ function setGameMode(mode) {
         if (quitBtn) quitBtn.style.display = '';
         updateModeLabel('pvai');
     } else if (mode === 'pvp') {
-        if (diffSel) diffSel.style.display = 'none';
         if (undoBtn) undoBtn.style.display = '';
         if (statsBar) statsBar.style.display = 'none';
         if (roomInfoBar) roomInfoBar.style.display = 'none';
@@ -598,7 +572,6 @@ function setGameMode(mode) {
         if (quitBtn) quitBtn.style.display = '';
         updateModeLabel('pvp');
     } else if (mode === 'online') {
-        if (diffSel) diffSel.style.display = 'none';
         if (undoBtn) undoBtn.style.display = 'none';
         if (statsBar) statsBar.style.display = 'none';
         if (roomInfoBar) roomInfoBar.style.display = 'flex';
@@ -812,22 +785,24 @@ function init() {
         setState({ rank: 'Easy', levelWins: 0 });
     }
 
+    // Ensure level-bound personality is applied on load
+    let initialPersonality = 'random';
+    const currentRank = getState().rank;
+    if (currentRank === 'Medium') initialPersonality = 'defensive';
+    else if (currentRank === 'Hard') initialPersonality = 'aggressive';
+    else if (currentRank === 'Champion') initialPersonality = 'perfect';
+    setState({ aiPersonality: initialPersonality, adaptiveDifficulty: false });
+
     const s = getState();
     applyTheme(s.theme);
     initParticleBackground();
     if (s.soundEnabled !== undefined) setSoundEnabled(s.soundEnabled);
 
     updateScoreDisplay(s.playerScore, s.aiScore);
-    updateStatsDisplay(s.rank, s.levelWins, s.playerWins);
+    updateStatsDisplay(s.rank, s.levelWins, s.playerWins, s.drawStreak);
     updateModeLabel(s.gameMode);
     renderStatsPanel(s.stats);
     renderMatchHistory(s.matchHistory);
-
-    const sel = document.getElementById('aiPersonality');
-    if (sel) sel.value = s.aiPersonality;
-
-    const ddaToggle = document.getElementById('ddaToggle');
-    if (ddaToggle) ddaToggle.checked = s.adaptiveDifficulty;
 
     const modeSel = document.getElementById('modeSelect');
     if (modeSel) modeSel.value = s.gameMode === 'online' ? 'pvai' : s.gameMode;
@@ -927,22 +902,7 @@ function init() {
         setState({ soundEnabled: enabled });
         persistState();
     });
-    sel?.addEventListener('change', (e) => {
-        const personality = e.target.value;
-        setState({
-            aiPersonality: personality,
-            adaptiveDifficulty: false // Manual override
-        });
-        const ddaToggle = document.getElementById('ddaToggle');
-        if (ddaToggle) ddaToggle.checked = false;
-        persistState();
-        restartGame();
-    });
 
-    document.getElementById('ddaToggle')?.addEventListener('change', (e) => {
-        setState({ adaptiveDifficulty: e.target.checked });
-        persistState();
-    });
     modeSel?.addEventListener('change', (e) => setGameMode(e.target.value));
     document.querySelectorAll('.theme-btn').forEach(btn => {
         btn.addEventListener('click', () => { setState({ theme: btn.dataset.theme }); applyTheme(btn.dataset.theme); persistState(); });
