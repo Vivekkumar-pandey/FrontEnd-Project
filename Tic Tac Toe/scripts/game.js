@@ -17,7 +17,7 @@ import {
     showPopup, hidePopup, hideAllPopups,
     setTimerDisplay, updateModeLabel, updateRoomInfoBar,
     toggleSound, setSoundEnabled,
-    renderStatsPanel,
+    renderStatsPanel, renderMatchHistory,
     shakeBoard,
 } from './ui.js';
 import {

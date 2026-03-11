@@ -46,6 +46,7 @@ const initialState = {
     matchHistory: [],
     winStreak: 0,
     lossStreak: 0,
+    drawStreak: 0,
 
     // Online
     myMark: 'X',
