@@ -7,7 +7,6 @@
 
 import { checkWinner, isBoardFull, createTimer } from './utils.js';
 import { getState, setState, subscribe, resetGameState, resetAllScores, calculateRank } from './state.js';
-import { getRoomCode } from './multiplayer.js';
 import { getAIMove } from './ai.js';
 import { loadState, saveState, loadStats, saveStats } from './storage.js';
 import {
@@ -41,12 +40,7 @@ function persistState() {
     saveState({
         playerScore: s.playerScore,
         aiScore: s.aiScore,
-        level: s.level,
         playerWins: s.playerWins,
-        hardWins: s.hardWins,
-        drawStreak: s.drawStreak,
-        difficulty: s.difficulty,
-        manualDifficulty: s.manualDifficulty,
         theme: s.theme,
         gameMode: s.gameMode === 'online' ? 'pvai' : s.gameMode,
         soundEnabled: s.soundEnabled,
@@ -187,7 +181,6 @@ function makeMove(index, mark) {
             const cur = getState();
             if (cur.gameStatus !== 'playing') return;
             const aiPersonality = cur.aiPersonality;
-            console.log("Resolved AI personality:", aiPersonality); // Temporary log for validation
             const aiIdx = getAIMove(cur.board, aiPersonality, 'O', 'X');
             setState({ isAIThinking: false });
             makeMove(aiIdx, 'O');
@@ -272,7 +265,7 @@ function handleWin(mark) {
 
     const cur = getState();
     updateScoreDisplay(cur.playerScore, cur.aiScore);
-    updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
+    updateStatsDisplay(cur.rank, cur.playerRating, cur.playerWins);
     renderStatsPanel(cur.stats);
     persistState();
 }
@@ -302,7 +295,7 @@ function handleDraw() {
     }
 
     const cur = getState();
-    updateStatsDisplay(cur.level, cur.drawStreak, cur.playerWins);
+    updateStatsDisplay(cur.rank, cur.playerRating, cur.playerWins);
     renderStatsPanel(cur.stats);
     setTimeout(() => showPopup('drawPopup'), 300);
     persistState();
@@ -385,7 +378,6 @@ function updateProgression(outcome) {
     if (sel && s.adaptiveDifficulty) sel.value = newPersonality;
 
     updateStatsDisplay(newRank, newRating, s.playerWins);
-    console.log(`[ELO] Rating: ${newRating} (${ratingDelta > 0 ? '+' + ratingDelta : ratingDelta}) | Rank: ${newRank} | DDA Streak [W:${newWinStreak} L:${newLossStreak}]`);
 }
 
 function showRankUpPopup(newRank) {
@@ -540,9 +532,10 @@ function startNewRound() {
 function restartGame() {
     resetAllScores();
     updateScoreDisplay(0, 0);
-    updateStatsDisplay(1, 0, 0);
-    const sel = document.getElementById('difficulty');
-    if (sel) sel.value = 'easy';
+    const s = getState();
+    updateStatsDisplay(s.rank, s.playerRating, 0);
+    const sel = document.getElementById('aiPersonality');
+    if (sel) sel.value = s.aiPersonality;
     persistState();
     startNewRound();
 }
@@ -851,15 +844,7 @@ function init() {
         restartGame();
     });
 
-    // Custom Leave Room Behavior
-    document.getElementById('leaveRoomBtn')?.addEventListener('click', () => {
-        if (getState().gameMode === 'online') {
-            disconnect(true); // send leave signal
-            setGameMode('pvai'); // reset to menu state essentially
-            showPopup('lobbyPopup'); // Immediately pop the lobby back open
-            setGameMode('online'); // Trigger the UI cleanups for online mode
-        }
-    });
+    // leaveRoomBtn is already wired in setupMultiplayer()
 
     document.getElementById('undoBtn')?.addEventListener('click', undoLastMove);
 
@@ -872,7 +857,7 @@ function init() {
             document.getElementById('hintBtn').textContent = '💡 No hints left';
             return;
         }
-        const bestIdx = getAIMove(s.board, 'hard', 'X', 'O');
+        const bestIdx = getAIMove(s.board, 'perfect', 'X', 'O');
         if (bestIdx < 0) return;
         const cell = document.querySelector(`.cell[data-index="${bestIdx}"]`);
         if (cell) {
@@ -938,6 +923,14 @@ function init() {
     });
     document.getElementById('statsClose')?.addEventListener('click', () => {
         document.getElementById('statsSidebar')?.classList.remove('open');
+    });
+
+    // History sidebar toggle
+    document.getElementById('historyToggle')?.addEventListener('click', () => {
+        document.getElementById('historySidebar')?.classList.toggle('open');
+    });
+    document.getElementById('historyClose')?.addEventListener('click', () => {
+        document.getElementById('historySidebar')?.classList.remove('open');
     });
 }
 

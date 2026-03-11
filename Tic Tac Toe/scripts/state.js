@@ -20,12 +20,7 @@ const initialState = {
     aiScore: 0,
 
     // Progression
-    level: 1,
     playerWins: 0,
-    hardWins: 0,
-    drawStreak: 0,
-    difficulty: 'easy',
-    manualDifficulty: false,
 
     // Lifetime statistics
     stats: {
@@ -145,10 +140,7 @@ export function resetAllScores() {
         moveHistory: [],
         playerScore: 0,
         aiScore: 0,
-        level: 1,
         playerWins: 0,
-        hardWins: 0,
-        drawStreak: 0,
         winStreak: 0,
         lossStreak: 0,
     });

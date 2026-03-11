@@ -15,12 +15,7 @@ function defaultState() {
     return {
         playerScore: 0,
         aiScore: 0,
-        level: 1,
         playerWins: 0,
-        hardWins: 0,
-        drawStreak: 0,
-        difficulty: 'easy',
-        manualDifficulty: false,
         theme: 'dark',
         gameMode: 'pvai',
         soundEnabled: true,
@@ -87,20 +82,3 @@ export function saveStats(stats) {
     } catch { /* Storage full */ }
 }
 
-/* ────────────── Leaderboard ────────────── */
-
-export function getLeaderboard() {
-    try {
-        const raw = localStorage.getItem(LEADERBOARD_KEY);
-        return raw ? JSON.parse(raw) : [];
-    } catch {
-        return [];
-    }
-}
-
-export function addLeaderboardEntry(name, wins) {
-    const board = getLeaderboard();
-    board.push({ name, wins, date: new Date().toLocaleDateString() });
-    board.sort((a, b) => b.wins - a.wins);
-    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(board.slice(0, 10)));
-}
