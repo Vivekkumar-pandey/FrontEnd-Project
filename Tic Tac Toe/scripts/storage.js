@@ -20,10 +20,12 @@ function defaultState() {
         gameMode: 'pvai',
         soundEnabled: true,
         playerRating: 1000,
-        rank: 'Intermediate',
+        rank: 'Easy',
         aiPersonality: 'perfect',
         adaptiveDifficulty: true,
         matchHistory: [],
+        levelWins: 0,
+        drawStreak: 0,
     };
 }
 

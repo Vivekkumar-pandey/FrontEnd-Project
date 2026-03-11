@@ -40,13 +40,14 @@ const initialState = {
 
     // Advanced Indie Features
     playerRating: 1000,
-    rank: 'Intermediate',
+    rank: 'Easy',
     aiPersonality: 'perfect',
     adaptiveDifficulty: true,
     matchHistory: [],
     winStreak: 0,
     lossStreak: 0,
     drawStreak: 0,
+    levelWins: 0,
 
     // Online
     myMark: 'X',
@@ -144,5 +145,8 @@ export function resetAllScores() {
         playerWins: 0,
         winStreak: 0,
         lossStreak: 0,
+        drawStreak: 0,
+        levelWins: 0,
+        rank: 'Easy',
     });
 }

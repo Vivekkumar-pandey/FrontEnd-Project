@@ -49,6 +49,8 @@ function persistState() {
         aiPersonality: s.aiPersonality,
         adaptiveDifficulty: s.adaptiveDifficulty,
         matchHistory: s.matchHistory,
+        levelWins: s.levelWins,
+        drawStreak: s.drawStreak,
     });
     saveStats(s.stats);
 }
@@ -210,12 +212,12 @@ function handleWin(mark) {
                 playerWins: s.playerWins + 1,
                 stats: newStats,
             });
-            // Update ELO & Progression
-            updateProgression('win');
+            // Level progression
+            const leveledUp = updateProgression('win');
             playWinSound();
             launchConfetti(3500);
             trackEvent('game_win', { aiPersonality: s.aiPersonality, duration });
-            setTimeout(() => showPopup('winPopup'), 500);
+            if (!leveledUp) setTimeout(() => showPopup('winPopup'), 500);
         } else {
             const newStats = { ...s.stats };
             newStats.gamesPlayed++;
@@ -229,7 +231,7 @@ function handleWin(mark) {
                 stats: newStats,
             });
             playLoseSound();
-            shakeBoard(); // Visual feedback on loss
+            shakeBoard();
             updateProgression('loss');
             trackEvent('game_loss', { aiPersonality: s.aiPersonality, duration });
             setTimeout(() => showPopup('aiWinPopup'), 500);
@@ -265,7 +267,7 @@ function handleWin(mark) {
 
     const cur = getState();
     updateScoreDisplay(cur.playerScore, cur.aiScore);
-    updateStatsDisplay(cur.rank, cur.playerRating, cur.playerWins);
+    updateStatsDisplay(cur.rank, cur.levelWins, cur.playerWins);
     renderStatsPanel(cur.stats);
     persistState();
 }
@@ -289,15 +291,16 @@ function handleDraw() {
     playDrawSound();
     trackEvent('game_draw', { aiPersonality: s.aiPersonality, duration });
 
+    let leveledUp = false;
     if (s.gameMode === 'pvai') {
-        updateProgression('draw');
+        leveledUp = updateProgression('draw');
         saveMatchHistory('draw');
     }
 
     const cur = getState();
-    updateStatsDisplay(cur.rank, cur.playerRating, cur.playerWins);
+    updateStatsDisplay(cur.rank, cur.levelWins, cur.playerWins);
     renderStatsPanel(cur.stats);
-    setTimeout(() => showPopup('drawPopup'), 300);
+    if (!leveledUp) setTimeout(() => showPopup('drawPopup'), 300);
     persistState();
 }
 
@@ -305,28 +308,34 @@ function handleDraw() {
 
 function updateProgression(outcome) {
     const s = getState();
-    let ratingDelta = 0;
 
-    // 1. Calculate ELO Changes
-    if (outcome === 'win') {
-        if (s.aiPersonality === 'perfect') ratingDelta = 25;
-        else if (s.aiPersonality === 'aggressive' || s.aiPersonality === 'defensive') ratingDelta = 15;
-        else ratingDelta = 5;
-    } else if (outcome === 'loss') {
-        if (s.aiPersonality === 'perfect') ratingDelta = -10;
-        else if (s.aiPersonality === 'aggressive' || s.aiPersonality === 'defensive') ratingDelta = -15;
-        else ratingDelta = -25;
-    } else if (outcome === 'draw') {
-        if (s.aiPersonality === 'perfect') ratingDelta = 10;
-        else if (s.aiPersonality === 'aggressive' || s.aiPersonality === 'defensive') ratingDelta = 5;
-        else ratingDelta = -5;
+    // 1. Track level wins (only wins count toward level progression)
+    let newLevelWins = outcome === 'win' ? s.levelWins + 1 : s.levelWins;
+
+    // drawStreak is already updated by handleWin/handleDraw before this call
+    const currentDrawStreak = s.drawStreak;
+
+    // 2. Check level-up conditions
+    //    Easy   → Medium   : 5 wins
+    //    Medium → Hard     : 7 wins OR 5-game draw streak
+    //    Hard   → Champion : 10 wins OR 7-game draw streak
+    const currentLevel = s.rank;
+    let newLevel = currentLevel;
+    let leveledUp = false;
+
+    if (currentLevel === 'Easy' && newLevelWins >= 5) {
+        newLevel = 'Medium';
+        newLevelWins = 0;
+        leveledUp = true;
+    } else if (currentLevel === 'Medium' && (newLevelWins >= 7 || currentDrawStreak >= 5)) {
+        newLevel = 'Hard';
+        newLevelWins = 0;
+        leveledUp = true;
+    } else if (currentLevel === 'Hard' && (newLevelWins >= 10 || currentDrawStreak >= 7)) {
+        newLevel = 'Champion';
+        newLevelWins = 0;
+        leveledUp = true;
     }
-
-    // 2. Determine New Rank
-    const prevRating = s.playerRating;
-    const newRating = Math.max(0, prevRating + ratingDelta);
-    const prevRank = s.rank;
-    const newRank = calculateRank(newRating);
 
     // 3. Dynamic Difficulty Adjustment (DDA)
     let newWinStreak = outcome === 'win' ? s.winStreak + 1 : 0;
@@ -342,42 +351,57 @@ function updateProgression(outcome) {
         const curTierIdx = AI_TIERS.indexOf(s.aiPersonality);
         if (newWinStreak >= 4 && curTierIdx < AI_TIERS.length - 1) {
             newPersonality = AI_TIERS[curTierIdx + 1];
-            newWinStreak = 0; // Reset after promotion
+            newWinStreak = 0;
             trackEvent('dda_increase', { to: newPersonality });
         } else if (newLossStreak >= 3 && curTierIdx > 0) {
             newPersonality = AI_TIERS[curTierIdx - 1];
-            newLossStreak = 0; // Reset after demotion
+            newLossStreak = 0;
             trackEvent('dda_decrease', { to: newPersonality });
         }
     }
 
-    // Update State
-    setState({
-        playerRating: newRating,
-        rank: newRank,
+    // 4. Update State
+    const stateUpdate = {
+        rank: newLevel,
+        levelWins: newLevelWins,
         winStreak: newWinStreak,
         lossStreak: newLossStreak,
-        aiPersonality: newPersonality
-    });
+        aiPersonality: newPersonality,
+    };
+    if (leveledUp) stateUpdate.drawStreak = 0;
+    setState(stateUpdate);
 
-    // Handle Rank Up popups (prevent alert spam on deranks)
-    const ranks = ['Beginner', 'Intermediate', 'Advanced', 'Master', 'Grandmaster'];
-    if (ranks.indexOf(newRank) > ranks.indexOf(prevRank)) {
-        playLevelUpSound();
-        launchConfetti(4000);
-        showRankUpPopup(newRank);
-    } else if (newRank === 'Grandmaster' && prevRank !== 'Grandmaster') {
-        playLevelUpSound();
-        launchConfetti(5000);
-        trackEvent('champion');
-        setTimeout(() => showPopup('championPopup'), 600);
-    }
-
-    // Update UI Elements
+    // 5. Update AI personality selector
     const sel = document.getElementById('aiPersonality');
     if (sel && s.adaptiveDifficulty) sel.value = newPersonality;
 
-    updateStatsDisplay(newRank, newRating, s.playerWins);
+    // 6. Update stats display
+    updateStatsDisplay(newLevel, newLevelWins, getState().playerWins);
+
+    // 7. Show level-up feedback
+    if (leveledUp) {
+        if (newLevel === 'Champion') {
+            playLevelUpSound();
+            launchConfetti(5000);
+            trackEvent('champion');
+
+            const cur = getState();
+            const champWins = document.getElementById('champWins');
+            const champStreak = document.getElementById('champStreak');
+            const champFastest = document.getElementById('champFastest');
+            if (champWins) champWins.textContent = cur.stats.wins;
+            if (champStreak) champStreak.textContent = cur.stats.bestStreak;
+            if (champFastest) champFastest.textContent = cur.stats.fastestWin !== null ? cur.stats.fastestWin + 's' : '--';
+
+            setTimeout(() => showPopup('championPopup'), 600);
+        } else {
+            playLevelUpSound();
+            launchConfetti(4000);
+            showRankUpPopup(newLevel);
+        }
+    }
+
+    return leveledUp;
 }
 
 function showRankUpPopup(newRank) {
@@ -533,7 +557,7 @@ function restartGame() {
     resetAllScores();
     updateScoreDisplay(0, 0);
     const s = getState();
-    updateStatsDisplay(s.rank, s.playerRating, 0);
+    updateStatsDisplay(s.rank, 0, 0);
     const sel = document.getElementById('aiPersonality');
     if (sel) sel.value = s.aiPersonality;
     persistState();
@@ -782,13 +806,19 @@ function init() {
     const savedStats = loadStats();
     setState({ ...saved, stats: { ...getState().stats, ...savedStats } });
 
+    // Migrate old ELO-based ranks to new level system
+    const validLevels = ['Easy', 'Medium', 'Hard', 'Champion'];
+    if (!validLevels.includes(getState().rank)) {
+        setState({ rank: 'Easy', levelWins: 0 });
+    }
+
     const s = getState();
     applyTheme(s.theme);
     initParticleBackground();
     if (s.soundEnabled !== undefined) setSoundEnabled(s.soundEnabled);
 
     updateScoreDisplay(s.playerScore, s.aiScore);
-    updateStatsDisplay(s.rank, s.playerRating, s.playerWins);
+    updateStatsDisplay(s.rank, s.levelWins, s.playerWins);
     updateModeLabel(s.gameMode);
     renderStatsPanel(s.stats);
     renderMatchHistory(s.matchHistory);
@@ -833,7 +863,8 @@ function init() {
         if (getState().gameMode === 'online' && isConnected()) sendRestart();
         startNewRound();
     });
-    document.getElementById('championPopupOk')?.addEventListener('click', restartGame);
+    document.getElementById('championPopupOk')?.addEventListener('click', startNewRound);
+    document.getElementById('championResetBtn')?.addEventListener('click', restartGame);
     document.getElementById('restart')?.addEventListener('click', () => {
         if (getState().gameMode === 'online' && isConnected()) sendRestart();
         startNewRound();
